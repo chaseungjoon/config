@@ -1,0 +1,313 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  i3 :: HORIZON                                                       ║
+# ║  palette "EVENT HORIZON" · Inter + JetBrainsMono NF · picom v13      ║
+# ║  SUPER+F1 shows every binding                                        ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+set $mod Mod4
+set $alt Mod1
+
+# ── programs ────────────────────────────────────────────────────────────
+# window-decoration=none lives in ~/.config/ghostty/config. SUPER+ENTER goes through
+# scripts/term -> `ghostty +new-window` on a resident instance: ~60 ms vs ~400 ms cold
+set $term     ghostty
+set $newterm  ~/.config/i3/scripts/term
+set $browser  google-chrome
+set $i3dir    ~/.config/i3
+set $scripts  ~/.config/i3/scripts
+set $bin      ~/.config/i3/bin
+set $rofi     ~/.config/i3/bin/rofi
+# NB: i3 does not expand variables inside `set` values, so never nest them
+# ($launcher = "$rofi -show drun" reached the shell literally — that was the
+# dead SUPER+R). Every path below is spelled out in full.
+set $launcher ~/.config/i3/bin/rofi -show drun
+set $lock     ~/.config/i3/scripts/lock
+
+# ── palette "EVENT HORIZON" ─────────────────────────────────────────────
+# blue-tinted neutral ramp + ONE accent (deep blue #2b5cff; #7d98ff for accent text);
+# cyan is its lighter partner, red is reserved for alerts. Shared verbatim by
+# eww/eww.scss, rofi/horizon.rasi, dunstrc and scripts/lock.
+set $crust    #060a14
+set $base     #0a1020
+set $mantle   #0f172b
+set $surface  #162038
+set $overlay  #22304f
+set $muted    #56688f
+set $subtext  #9db0d3
+set $text     #e1e9f7
+set $accent   #2b5cff
+set $cyan     #56d4f5
+set $red      #ff6b81
+
+# ── look ────────────────────────────────────────────────────────────────
+font pango:Inter SemiBold 10
+
+# no window borders at all — focus is shown by picom dimming the other windows
+default_border          pixel 0
+default_floating_border pixel 0
+hide_edge_borders       both
+title_align             center
+for_window [class=".*"] title_format "%title", title_window_icon padding 4px
+
+# 10px between windows and under the 46px eww bar (top 46 + inner 10);
+# the left/right/bottom screen edges are tighter at 6px (outer -4 + inner 10)
+gaps inner  10
+gaps outer  0
+gaps top    46
+gaps left   -4
+gaps right  -4
+gaps bottom -4
+smart_gaps    off
+
+# only visible as tab/stack titles (borders are off)
+# class                 border    bg        text      indicator  child_border
+client.focused          $surface  $surface  $text     $accent    $surface
+client.focused_inactive $mantle   $mantle   $subtext  $mantle    $mantle
+client.unfocused        $base     $base     $muted    $base      $base
+client.urgent           $red      $red      $crust    $red       $red
+client.placeholder      $base     $base     $muted    $base      $base
+client.background       $crust
+
+# ── behaviour ───────────────────────────────────────────────────────────
+focus_follows_mouse         no
+mouse_warping               output
+focus_on_window_activation  smart
+workspace_auto_back_and_forth yes
+floating_modifier           $mod
+tiling_drag                 modifier titlebar
+floating_minimum_size       240 x 140
+floating_maximum_size       2300 x 1300
+
+# ── autostart ───────────────────────────────────────────────────────────
+# display: run every output at its preferred resolution and highest refresh rate
+exec --no-startup-id $scripts/display-init
+exec --no-startup-id xrdb -merge $i3dir/Xresources
+exec --no-startup-id xsetroot -cursor_name left_ptr -solid '#060a14'
+# keyboard: CapsLock = Super, Win = Win, Ctrl = Ctrl (+ Keychron Alt<->Win), repeat 250/40.
+# scripts/kbd-guard re-applies it whenever a keyboard reconnects, because X would otherwise
+# hand the reconnected keyboard /etc/default/keyboard's ctrl:swap_lwin_lctl
+exec_always --no-startup-id $scripts/kbd-guard
+# mouse: mirror GNOME's pointer speed (libinput), no natural scrolling
+exec --no-startup-id $scripts/input-init
+# never lock or blank on idle (X screensaver + DPMS off, so xss-lock only fires on suspend)
+exec --no-startup-id xset s off -dpms
+exec --no-startup-id xss-lock --transfer-sleep-lock -- $lock
+exec --no-startup-id $bin/polkit-agent
+# GTK theme / icons / cursor / fonts straight from your GNOME settings (Orchis-Dark, Papirus…)
+exec --no-startup-id /usr/libexec/gsd-xsettings
+# Korean input: ibus with the hangul engine (Shift+Space / Hangul key toggles 한/A)
+exec --no-startup-id $scripts/ime-init
+# notifications start OFF (paused); the bar bell / SUPER+SHIFT+D turns them on
+exec --no-startup-id $scripts/notifd
+exec --no-startup-id $scripts/clipd
+exec --no-startup-id $bin/unclutter --timeout 4 --jitter 5 --ignore-scrolling
+# XDG autostart: nm-applet, blueman, jetbrains toolbox… (nm-tray is masked for i3)
+exec --no-startup-id dex --autostart --environment i3
+# GPU: select PowerMizer "Prefer Maximum Performance" where supported.
+# On adaptive it idles at 382 MHz and every animation starts while it's still clocking
+# up, so the first frames stutter. Costs about 19 W at idle. The mode only lasts while
+# the X client that set it stays connected, so scripts/gpu-perf holds it for the session
+exec --no-startup-id ~/.config/i3/scripts/gpu-perf
+# resident ghostty so SUPER+ENTER opens a window instantly (see scripts/term)
+exec --no-startup-id ghostty --gtk-single-instance=true --initial-window=false --quit-after-last-window-closed=false
+# …and one for the SUPER+SHIFT+H key sheet, pre-sized so it opens instantly without resizing
+exec --no-startup-id ~/.config/i3/scripts/keysheet-open --start
+# picom v13 (self-built, animations) + crash watchdog; restarted on every i3 restart
+exec_always --no-startup-id ~/.config/i3/scripts/compositor
+exec_always --no-startup-id $scripts/wallpaper-restore
+exec_always --no-startup-id $scripts/autotiling-start
+
+# ── workspaces ──────────────────────────────────────────────────────────
+set $ws1  "1"
+set $ws2  "2"
+set $ws3  "3"
+set $ws4  "4"
+set $ws5  "5"
+set $ws6  "6"
+set $ws7  "7"
+set $ws8  "8"
+set $ws9  "9"
+set $ws10 "10"
+
+# switch to workspace
+bindsym $mod+1 workspace number $ws1
+bindsym $mod+2 workspace number $ws2
+bindsym $mod+3 workspace number $ws3
+bindsym $mod+4 workspace number $ws4
+bindsym $mod+5 workspace number $ws5
+bindsym $mod+6 workspace number $ws6
+bindsym $mod+7 workspace number $ws7
+bindsym $mod+8 workspace number $ws8
+bindsym $mod+9 workspace number $ws9
+bindsym $mod+0 workspace number $ws10
+
+# move window to workspace (and follow it)
+bindsym $mod+Shift+1 move container to workspace number $ws1;  workspace number $ws1
+bindsym $mod+Shift+2 move container to workspace number $ws2;  workspace number $ws2
+bindsym $mod+Shift+3 move container to workspace number $ws3;  workspace number $ws3
+bindsym $mod+Shift+4 move container to workspace number $ws4;  workspace number $ws4
+bindsym $mod+Shift+5 move container to workspace number $ws5;  workspace number $ws5
+bindsym $mod+Shift+6 move container to workspace number $ws6;  workspace number $ws6
+bindsym $mod+Shift+7 move container to workspace number $ws7;  workspace number $ws7
+bindsym $mod+Shift+8 move container to workspace number $ws8;  workspace number $ws8
+bindsym $mod+Shift+9 move container to workspace number $ws9;  workspace number $ws9
+bindsym $mod+Shift+0 move container to workspace number $ws10; workspace number $ws10
+
+# move window to workspace silently (stay here)
+bindsym $mod+Ctrl+1 move container to workspace number $ws1
+bindsym $mod+Ctrl+2 move container to workspace number $ws2
+bindsym $mod+Ctrl+3 move container to workspace number $ws3
+bindsym $mod+Ctrl+4 move container to workspace number $ws4
+bindsym $mod+Ctrl+5 move container to workspace number $ws5
+bindsym $mod+Ctrl+6 move container to workspace number $ws6
+bindsym $mod+Ctrl+7 move container to workspace number $ws7
+bindsym $mod+Ctrl+8 move container to workspace number $ws8
+bindsym $mod+Ctrl+9 move container to workspace number $ws9
+bindsym $mod+Ctrl+0 move container to workspace number $ws10
+
+# cycle workspaces / jump back / send workspace to other monitor
+bindsym $mod+bracketright workspace next_on_output
+bindsym $mod+bracketleft  workspace prev_on_output
+bindsym $mod+Shift+Tab    workspace back_and_forth
+bindsym $mod+o            move workspace to output next
+
+# ── launchers ───────────────────────────────────────────────────────────
+bindsym $mod+Return       exec --no-startup-id $newterm
+bindsym $mod+Shift+Return exec --no-startup-id $term --class=ghostty.float
+bindsym $mod+b            exec --no-startup-id $browser
+bindsym $mod+Shift+b      exec --no-startup-id $browser --incognito
+bindsym $mod+r            exec --no-startup-id $launcher
+bindsym $mod+Tab          exec --no-startup-id $rofi -show window
+bindsym $mod+c            exec --no-startup-id code
+bindsym $mod+Shift+c      exec --no-startup-id chatgpt
+bindsym $mod+p            exec --no-startup-id $scripts/clipmenu
+bindsym $mod+e            exec --no-startup-id nautilus --new-window
+bindsym $mod+m            exec --no-startup-id spotify
+bindsym $mod+n            exec --no-startup-id $term --class=ghostty.code -e nvim
+bindsym $mod+g            exec --no-startup-id $term --class=ghostty.code -e lazygit
+bindsym $mod+grave        exec --no-startup-id $scripts/scratch-term
+bindsym XF86Launch1       exec --no-startup-id $scripts/float btop
+bindsym $mod+F1           exec --no-startup-id $scripts/keyhelp
+bindsym $mod+Shift+h      exec --no-startup-id $scripts/keysheet-open
+bindsym $mod+Shift+w      exec --no-startup-id $scripts/wallpaper-picker
+
+# ── input language ──────────────────────────────────────────────────────
+# English <-> 한국어 (ibus engines), badge in the bar
+bindsym $mod+d exec --no-startup-id $scripts/ime
+
+# ── window focus (vim + arrows) ─────────────────────────────────────────
+bindsym $mod+h     focus left
+bindsym $mod+j     focus down
+bindsym $mod+k     focus up
+bindsym $mod+l     focus right
+bindsym $mod+Left  focus left
+bindsym $mod+Down  focus down
+bindsym $mod+Up    focus up
+bindsym $mod+Right focus right
+bindsym $mod+a     focus parent
+bindsym $mod+Shift+a focus child
+bindsym $mod+space focus mode_toggle
+
+# ── move windows ────────────────────────────────────────────────────────
+bindsym $mod+Shift+j     move down  30 px
+bindsym $mod+Shift+k     move up    30 px
+bindsym $mod+Shift+l     move right 30 px
+bindsym $mod+Shift+Left  move left  30 px
+bindsym $mod+Shift+Down  move down  30 px
+bindsym $mod+Shift+Up    move up    30 px
+bindsym $mod+Shift+Right move right 30 px
+
+# ── resize (direct, no mode needed) ─────────────────────────────────────
+bindsym $mod+Ctrl+h     resize shrink width  40 px or 4 ppt
+bindsym $mod+Ctrl+j     resize grow   height 40 px or 4 ppt
+bindsym $mod+Ctrl+k     resize shrink height 40 px or 4 ppt
+bindsym $mod+Ctrl+l     resize grow   width  40 px or 4 ppt
+bindsym $mod+Ctrl+Left  resize shrink width  40 px or 4 ppt
+bindsym $mod+Ctrl+Down  resize grow   height 40 px or 4 ppt
+bindsym $mod+Ctrl+Up    resize shrink height 40 px or 4 ppt
+bindsym $mod+Ctrl+Right resize grow   width  40 px or 4 ppt
+bindsym $mod+equal      resize set 50 ppt 50 ppt
+
+# ── layout ──────────────────────────────────────────────────────────────
+# autotiling picks the split direction for you; these override it
+bindsym $mod+backslash split h
+bindsym $mod+v         split v
+bindsym $mod+s         layout stacking
+bindsym $mod+w         layout tabbed
+bindsym $mod+t         layout toggle split
+bindsym $mod+f         fullscreen toggle
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+Shift+f   floating enable, resize set 1400 860, move position center
+bindsym $mod+y         sticky toggle
+bindsym $mod+Shift+g   gaps inner all toggle 10
+bindsym $mod+Shift+u   [urgent=latest] focus
+
+# ── volume on the keyboard (SUPER+-  /  SUPER++, i.e. SUPER+SHIFT+=) ─────
+# these took over the scratchpad keys; the dropdown terminal (SUPER+`) is unaffected
+bindsym $mod+minus       exec --no-startup-id $scripts/osd vol-down
+bindsym $mod+Shift+equal exec --no-startup-id $scripts/osd vol-up
+# PgUp / PgDn are volume keys too; they no longer scroll pages in apps
+bindsym Prior            exec --no-startup-id $scripts/osd vol-up
+bindsym Next             exec --no-startup-id $scripts/osd vol-down
+
+# ── close ───────────────────────────────────────────────────────────────
+bindsym $mod+q       kill
+bindsym $mod+Shift+q kill
+
+# ── session ─────────────────────────────────────────────────────────────
+bindsym $mod+Escape  exec --no-startup-id $scripts/powermenu
+bindsym $mod+Shift+r restart
+
+# ── screenshots (saved to ~/Pictures/Screenshots + copied) ──────────────
+bindsym Print             exec --no-startup-id $scripts/screenshot full
+bindsym Shift+Print       exec --no-startup-id $scripts/screenshot select
+bindsym $mod+Shift+s      exec --no-startup-id $scripts/screenshot select
+bindsym $mod+Print        exec --no-startup-id $scripts/screenshot window
+
+# ── hardware keys ───────────────────────────────────────────────────────
+bindsym XF86AudioRaiseVolume  exec --no-startup-id $scripts/osd vol-up
+bindsym XF86AudioLowerVolume  exec --no-startup-id $scripts/osd vol-down
+bindsym XF86AudioMute         exec --no-startup-id $scripts/osd vol-mute
+bindsym XF86AudioMicMute      exec --no-startup-id $scripts/osd mic-mute
+bindsym XF86MonBrightnessUp   exec --no-startup-id $scripts/osd bright-up
+bindsym XF86MonBrightnessDown exec --no-startup-id $scripts/osd bright-down
+bindsym $mod+F5               exec --no-startup-id $scripts/osd bright-down
+bindsym $mod+F6               exec --no-startup-id $scripts/osd bright-up
+bindsym XF86AudioPlay         exec --no-startup-id playerctl play-pause
+bindsym XF86AudioNext         exec --no-startup-id playerctl next
+bindsym XF86AudioPrev         exec --no-startup-id playerctl previous
+bindsym XF86AudioStop         exec --no-startup-id playerctl stop
+bindsym XF86Display           exec --no-startup-id $scripts/monitors
+bindsym $mod+F7               exec --no-startup-id $scripts/monitors
+bindsym $mod+Shift+n          exec --no-startup-id $scripts/nightlight
+bindsym $mod+Shift+d          exec --no-startup-id ~/.config/i3/eww/scripts/dnd toggle
+bindsym $mod+period           exec --no-startup-id dunstctl close-all
+bindsym $mod+comma            exec --no-startup-id dunstctl history-pop
+
+# ── window rules ────────────────────────────────────────────────────────
+for_window [window_role="pop-up"]       floating enable
+for_window [window_role="bubble"]       floating enable
+for_window [window_role="dialog"]       floating enable
+for_window [window_type="dialog"]       floating enable
+for_window [window_role="About"]        floating enable
+# 1390x656 = the 134x27-cell sheet at font-size 13 + padding: it maps at its final size,
+# so it never visibly resizes (scripts/keysheet still re-fits if the sheet ever grows)
+for_window [class="ghostty.keys"]       floating enable, resize set 1390 656, move position center
+for_window [class="ghostty.float"]      floating enable, resize set 1400 860, move position center
+# bar-launched TUIs (btop, nmtui, nvtop): 110x40 cells. ghostty cells are 13x28 px at
+# font-size 16, plus 10 px of padding: 110*13+10 = 1440..1452 wide, 40*28+10 = 1130..1157 tall
+for_window [class="ghostty.tui"]        floating enable, resize set 1446 1140, move position center
+for_window [class="Pavucontrol"]        floating enable, resize set 1100 700, move position center
+for_window [class="Nm-connection-editor"] floating enable
+for_window [class="Blueman-manager"]    floating enable, resize set 900 600, move position center
+for_window [class="Arandr"]             floating enable
+for_window [class="Google-chrome" window_role="pop-up"] floating enable, move position center
+for_window [title="^Picture[ -]in[ -][Pp]icture$"] floating enable, sticky enable
+# borderless everywhere, including apps that ask for i3 decorations
+for_window [class=".*"]                 border pixel 0
+for_window [instance="^dropdown$"]      floating enable, resize set 1600 760, move position center, sticky enable
+
+# ── bar ─────────────────────────────────────────────────────────────────
+# eww: one full-width frosted strip with pill modules — see eww/eww.yuck + eww.scss.
+# it is override-redirect (keeps real transparency), so `gaps top` above reserves its 46px
+exec_always --no-startup-id ~/.config/i3/eww/launch

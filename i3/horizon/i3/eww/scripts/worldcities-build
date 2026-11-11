@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+# Build eww/worldcities.tsv (city <TAB> country <TAB> tz <TAB> kind) for the world-clock picker:
+#   * every country's capital (kind "capital")
+#   * every city in the system tz database (/usr/share/zoneinfo/zone.tab + iso3166.tab)
+#   * well-known cities that aren't tz names (San Francisco, Osaka, Mumbai, ...)
+# Every tz is validated with zoneinfo; duplicates (same city + tz) are dropped.
+import os, zoneinfo
+
+OUT = os.path.expanduser("~/.config/i3/eww/worldcities.tsv")
+
+CAPITALS = """\
+Afghanistan|Kabul|Asia/Kabul
+Albania|Tirana|Europe/Tirane
+Algeria|Algiers|Africa/Algiers
+Andorra|Andorra la Vella|Europe/Andorra
+Angola|Luanda|Africa/Luanda
+Antigua and Barbuda|St. John's|America/Antigua
+Argentina|Buenos Aires|America/Argentina/Buenos_Aires
+Armenia|Yerevan|Asia/Yerevan
+Australia|Canberra|Australia/Sydney
+Austria|Vienna|Europe/Vienna
+Azerbaijan|Baku|Asia/Baku
+Bahamas|Nassau|America/Nassau
+Bahrain|Manama|Asia/Bahrain
+Bangladesh|Dhaka|Asia/Dhaka
+Barbados|Bridgetown|America/Barbados
+Belarus|Minsk|Europe/Minsk
+Belgium|Brussels|Europe/Brussels
+Belize|Belmopan|America/Belize
+Benin|Porto-Novo|Africa/Porto-Novo
+Bhutan|Thimphu|Asia/Thimphu
+Bolivia|La Paz|America/La_Paz
+Bosnia and Herzegovina|Sarajevo|Europe/Sarajevo
+Botswana|Gaborone|Africa/Gaborone
+Brazil|Brasília|America/Sao_Paulo
+Brunei|Bandar Seri Begawan|Asia/Brunei
+Bulgaria|Sofia|Europe/Sofia
+Burkina Faso|Ouagadougou|Africa/Ouagadougou
+Burundi|Gitega|Africa/Bujumbura
+Cabo Verde|Praia|Atlantic/Cape_Verde
+Cambodia|Phnom Penh|Asia/Phnom_Penh
+Cameroon|Yaoundé|Africa/Douala
+Canada|Ottawa|America/Toronto
+Central African Republic|Bangui|Africa/Bangui
+Chad|N'Djamena|Africa/Ndjamena
+Chile|Santiago|America/Santiago
+China|Beijing|Asia/Shanghai
+Colombia|Bogotá|America/Bogota
+Comoros|Moroni|Indian/Comoro
+Congo|Brazzaville|Africa/Brazzaville
+DR Congo|Kinshasa|Africa/Kinshasa
+Costa Rica|San José|America/Costa_Rica
+Côte d'Ivoire|Yamoussoukro|Africa/Abidjan
+Croatia|Zagreb|Europe/Zagreb
+Cuba|Havana|America/Havana
+Cyprus|Nicosia|Asia/Nicosia
+Czechia|Prague|Europe/Prague
+Denmark|Copenhagen|Europe/Copenhagen
+Djibouti|Djibouti|Africa/Djibouti
+Dominica|Roseau|America/Dominica
+Dominican Republic|Santo Domingo|America/Santo_Domingo
+Ecuador|Quito|America/Guayaquil
+Egypt|Cairo|Africa/Cairo
+El Salvador|San Salvador|America/El_Salvador
+Equatorial Guinea|Malabo|Africa/Malabo
+Eritrea|Asmara|Africa/Asmara
+Estonia|Tallinn|Europe/Tallinn
+Eswatini|Mbabane|Africa/Mbabane
+Ethiopia|Addis Ababa|Africa/Addis_Ababa
+Fiji|Suva|Pacific/Fiji
+Finland|Helsinki|Europe/Helsinki
+France|Paris|Europe/Paris
+Gabon|Libreville|Africa/Libreville
+Gambia|Banjul|Africa/Banjul
+Georgia|Tbilisi|Asia/Tbilisi
+Germany|Berlin|Europe/Berlin
+Ghana|Accra|Africa/Accra
+Greece|Athens|Europe/Athens
+Grenada|St. George's|America/Grenada
+Guatemala|Guatemala City|America/Guatemala
+Guinea|Conakry|Africa/Conakry
+Guinea-Bissau|Bissau|Africa/Bissau
+Guyana|Georgetown|America/Guyana
+Haiti|Port-au-Prince|America/Port-au-Prince
+Honduras|Tegucigalpa|America/Tegucigalpa
+Hungary|Budapest|Europe/Budapest
+Iceland|Reykjavík|Atlantic/Reykjavik
+India|New Delhi|Asia/Kolkata
+Indonesia|Jakarta|Asia/Jakarta
+Iran|Tehran|Asia/Tehran
+Iraq|Baghdad|Asia/Baghdad
+Ireland|Dublin|Europe/Dublin
+Israel|Jerusalem|Asia/Jerusalem
+Italy|Rome|Europe/Rome
+Jamaica|Kingston|America/Jamaica
+Japan|Tokyo|Asia/Tokyo
+Jordan|Amman|Asia/Amman
+Kazakhstan|Astana|Asia/Almaty
+Kenya|Nairobi|Africa/Nairobi
+Kiribati|Tarawa|Pacific/Tarawa
+Kosovo|Pristina|Europe/Belgrade
+Kuwait|Kuwait City|Asia/Kuwait
+Kyrgyzstan|Bishkek|Asia/Bishkek
+Laos|Vientiane|Asia/Vientiane
+Latvia|Riga|Europe/Riga
+Lebanon|Beirut|Asia/Beirut
+Lesotho|Maseru|Africa/Maseru
+Liberia|Monrovia|Africa/Monrovia
+Libya|Tripoli|Africa/Tripoli
+Liechtenstein|Vaduz|Europe/Vaduz
+Lithuania|Vilnius|Europe/Vilnius
+Luxembourg|Luxembourg|Europe/Luxembourg
+Madagascar|Antananarivo|Indian/Antananarivo
+Malawi|Lilongwe|Africa/Blantyre
+Malaysia|Kuala Lumpur|Asia/Kuala_Lumpur
+Maldives|Malé|Indian/Maldives
+Mali|Bamako|Africa/Bamako
+Malta|Valletta|Europe/Malta
+Marshall Islands|Majuro|Pacific/Majuro
+Mauritania|Nouakchott|Africa/Nouakchott
+Mauritius|Port Louis|Indian/Mauritius
+Mexico|Mexico City|America/Mexico_City
+Micronesia|Palikir|Pacific/Pohnpei
+Moldova|Chișinău|Europe/Chisinau
+Monaco|Monaco|Europe/Monaco
+Mongolia|Ulaanbaatar|Asia/Ulaanbaatar
+Montenegro|Podgorica|Europe/Podgorica
+Morocco|Rabat|Africa/Casablanca
+Mozambique|Maputo|Africa/Maputo
+Myanmar|Naypyidaw|Asia/Yangon
+Namibia|Windhoek|Africa/Windhoek
+Nauru|Yaren|Pacific/Nauru
+Nepal|Kathmandu|Asia/Kathmandu
+Netherlands|Amsterdam|Europe/Amsterdam
+New Zealand|Wellington|Pacific/Auckland
+Nicaragua|Managua|America/Managua
+Niger|Niamey|Africa/Niamey
+Nigeria|Abuja|Africa/Lagos
+North Korea|Pyongyang|Asia/Pyongyang
+North Macedonia|Skopje|Europe/Skopje
+Norway|Oslo|Europe/Oslo
+Oman|Muscat|Asia/Muscat
+Pakistan|Islamabad|Asia/Karachi
+Palau|Ngerulmud|Pacific/Palau
+Palestine|Ramallah|Asia/Hebron
+Panama|Panama City|America/Panama
+Papua New Guinea|Port Moresby|Pacific/Port_Moresby
+Paraguay|Asunción|America/Asuncion
+Peru|Lima|America/Lima
+Philippines|Manila|Asia/Manila
+Poland|Warsaw|Europe/Warsaw
+Portugal|Lisbon|Europe/Lisbon
+Qatar|Doha|Asia/Qatar
+Romania|Bucharest|Europe/Bucharest
+Russia|Moscow|Europe/Moscow
+Rwanda|Kigali|Africa/Kigali
+Saint Kitts and Nevis|Basseterre|America/St_Kitts
+Saint Lucia|Castries|America/St_Lucia
+Saint Vincent and the Grenadines|Kingstown|America/St_Vincent
+Samoa|Apia|Pacific/Apia
+San Marino|San Marino|Europe/San_Marino
+São Tomé and Príncipe|São Tomé|Africa/Sao_Tome
+Saudi Arabia|Riyadh|Asia/Riyadh
+Senegal|Dakar|Africa/Dakar
+Serbia|Belgrade|Europe/Belgrade
+Seychelles|Victoria|Indian/Mahe
+Sierra Leone|Freetown|Africa/Freetown
+Singapore|Singapore|Asia/Singapore
+Slovakia|Bratislava|Europe/Bratislava
+Slovenia|Ljubljana|Europe/Ljubljana
+Solomon Islands|Honiara|Pacific/Guadalcanal
+Somalia|Mogadishu|Africa/Mogadishu
+South Africa|Pretoria|Africa/Johannesburg
+South Korea|Seoul|Asia/Seoul
+South Sudan|Juba|Africa/Juba
+Spain|Madrid|Europe/Madrid
+Sri Lanka|Sri Jayawardenepura Kotte|Asia/Colombo
+Sudan|Khartoum|Africa/Khartoum
+Suriname|Paramaribo|America/Paramaribo
+Sweden|Stockholm|Europe/Stockholm
+Switzerland|Bern|Europe/Zurich
+Syria|Damascus|Asia/Damascus
+Taiwan|Taipei|Asia/Taipei
+Tajikistan|Dushanbe|Asia/Dushanbe
+Tanzania|Dodoma|Africa/Dar_es_Salaam
+Thailand|Bangkok|Asia/Bangkok
+Timor-Leste|Dili|Asia/Dili
+Togo|Lomé|Africa/Lome
+Tonga|Nukuʻalofa|Pacific/Tongatapu
+Trinidad and Tobago|Port of Spain|America/Port_of_Spain
+Tunisia|Tunis|Africa/Tunis
+Turkey|Ankara|Europe/Istanbul
+Turkmenistan|Ashgabat|Asia/Ashgabat
+Tuvalu|Funafuti|Pacific/Funafuti
+Uganda|Kampala|Africa/Kampala
+Ukraine|Kyiv|Europe/Kyiv
+United Arab Emirates|Abu Dhabi|Asia/Dubai
+United Kingdom|London|Europe/London
+United States|Washington, D.C.|America/New_York
+Uruguay|Montevideo|America/Montevideo
+Uzbekistan|Tashkent|Asia/Tashkent
+Vanuatu|Port Vila|Pacific/Efate
+Vatican City|Vatican City|Europe/Vatican
+Venezuela|Caracas|America/Caracas
+Vietnam|Hanoi|Asia/Ho_Chi_Minh
+Yemen|Sana'a|Asia/Aden
+Zambia|Lusaka|Africa/Lusaka
+Zimbabwe|Harare|Africa/Harare
+"""
+
+EXTRAS = """\
+United States|San Francisco|America/Los_Angeles
+United States|Seattle|America/Los_Angeles
+United States|San Diego|America/Los_Angeles
+United States|Las Vegas|America/Los_Angeles
+United States|Portland|America/Los_Angeles
+United States|Boston|America/New_York
+United States|Miami|America/New_York
+United States|Atlanta|America/New_York
+United States|Philadelphia|America/New_York
+United States|Dallas|America/Chicago
+United States|Houston|America/Chicago
+United States|Austin|America/Chicago
+United States|San Antonio|America/Chicago
+United States|Salt Lake City|America/Denver
+Canada|Montréal|America/Toronto
+Canada|Calgary|America/Edmonton
+Mexico|Guadalajara|America/Mexico_City
+Brazil|Rio de Janeiro|America/Sao_Paulo
+Japan|Osaka|Asia/Tokyo
+Japan|Kyoto|Asia/Tokyo
+Japan|Sapporo|Asia/Tokyo
+Japan|Fukuoka|Asia/Tokyo
+South Korea|Busan|Asia/Seoul
+South Korea|Incheon|Asia/Seoul
+South Korea|Daegu|Asia/Seoul
+South Korea|Jeju|Asia/Seoul
+China|Shenzhen|Asia/Shanghai
+China|Guangzhou|Asia/Shanghai
+China|Chengdu|Asia/Shanghai
+China|Hangzhou|Asia/Shanghai
+India|Mumbai|Asia/Kolkata
+India|Bengaluru|Asia/Kolkata
+India|Chennai|Asia/Kolkata
+India|Hyderabad|Asia/Kolkata
+Vietnam|Da Nang|Asia/Ho_Chi_Minh
+Indonesia|Bali|Asia/Makassar
+Australia|Brisbane|Australia/Brisbane
+Australia|Perth|Australia/Perth
+New Zealand|Auckland|Pacific/Auckland
+United Kingdom|Manchester|Europe/London
+United Kingdom|Edinburgh|Europe/London
+Spain|Barcelona|Europe/Madrid
+Germany|Munich|Europe/Berlin
+Germany|Frankfurt|Europe/Berlin
+Germany|Hamburg|Europe/Berlin
+Italy|Milan|Europe/Rome
+Italy|Venice|Europe/Rome
+Switzerland|Geneva|Europe/Zurich
+France|Nice|Europe/Paris
+France|Lyon|Europe/Paris
+Russia|Saint Petersburg|Europe/Moscow
+Turkey|Istanbul|Europe/Istanbul
+South Africa|Cape Town|Africa/Johannesburg
+United Arab Emirates|Dubai|Asia/Dubai
+Saudi Arabia|Jeddah|Asia/Riyadh
+Israel|Tel Aviv|Asia/Jerusalem
+— |UTC|UTC
+"""
+
+valid = zoneinfo.available_timezones()
+iso = {}
+for l in open("/usr/share/zoneinfo/iso3166.tab"):
+    if l.startswith("#") or "\t" not in l:
+        continue
+    code, name = l.rstrip("\n").split("\t", 1)
+    iso[code] = name
+
+rows, seen, bad = [], set(), []
+
+
+def add(city, country, tz, kind):
+    if tz not in valid:
+        bad.append(f"{city} ({tz})")
+        return
+    key = (city.lower(), tz)
+    if key in seen:
+        return
+    seen.add(key)
+    rows.append((city, country, tz, kind))
+
+
+for l in CAPITALS.strip().splitlines():
+    country, city, tz = l.split("|")
+    add(city, country, tz, "capital")
+for l in EXTRAS.strip().splitlines():
+    country, city, tz = l.split("|")
+    add(city, country.strip(" —"), tz, "city")
+for l in open("/usr/share/zoneinfo/zone.tab"):
+    if l.startswith("#"):
+        continue
+    f = l.rstrip("\n").split("\t")
+    codes, tz = f[0], f[2]
+    city = tz.rsplit("/", 1)[-1].replace("_", " ")
+    country = iso.get(codes.split(",")[0], codes)
+    add(city, country, tz, "zone")
+
+rows.sort(key=lambda r: (r[0].lower(), r[1].lower()))
+with open(OUT, "w") as f:
+    for r in rows:
+        f.write("\t".join(r) + "\n")
+print(f"{len(rows)} cities -> {OUT}")
+if bad:
+    print("skipped (unknown tz):", ", ".join(bad))

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# eww listener: {"vol": 45, "muted": false} on every default-sink change.
+# dedup happens here: piping through `uniq` block-buffered the output and the bar never updated
+emit() {
+    local raw; raw=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)
+    awk -v m="$([[ $raw == *MUTED* ]] && echo true || echo false)" '{printf "{\"vol\": %d, \"muted\": %s}\n", $2*100+0.5, m}' <<<"$raw"
+}
+last=$(emit); echo "$last"
+pactl subscribe 2>/dev/null | grep --line-buffered -E "'change' on (sink|server)" | while read -r _; do
+    cur=$(emit)
+    [[ $cur != "$last" ]] && { echo "$cur"; last=$cur; }
+done

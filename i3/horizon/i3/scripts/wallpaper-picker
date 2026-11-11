@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# SUPER+SHIFT+W: thumbnail grid of ~/Pictures/wallpapers (and ~/Pictures) in rofi
+. ~/.config/i3/scripts/_env
+pics=$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/i3-wallthumbs; mkdir -p "$cache"
+mapfile -d '' files < <(find "$pics/wallpapers" "$pics" -maxdepth 1 -type f \
+    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0 2>/dev/null | sort -zu)
+(( ${#files[@]} )) || { notify-send -a wallpaper "Wallpaper" "no images in $pics/wallpapers"; exit 1; }
+list=""
+for f in "${files[@]}"; do
+    thumb="$cache/$(printf '%s' "$f" | md5sum | cut -c1-16).jpg"
+    [[ -f $thumb && $thumb -nt $f ]] || convert "$f[0]" -thumbnail 480x270^ -gravity center -extent 480x270 "$thumb" 2>/dev/null
+    list+="$(basename "$f")\0icon\x1f$thumb\n"
+done
+choice=$(printf "%b" "$list" | rofi -dmenu -i -p "󰋩" -show-icons -format i -theme-str '
+    window   { width: 1180px; }
+    listview { columns: 4; lines: 3; flow: horizontal; spacing: 10px; }
+    element  { orientation: vertical; padding: 8px; spacing: 6px; }
+    element-icon { size: 250px; horizontal-align: 0.5; }
+    element-text { horizontal-align: 0.5; font: "Inter 9"; text-color: #9db0d3; }
+    element selected.normal { border: 0; background-color: #162038; }
+    entry { placeholder: "Pick a wallpaper…"; }')
+[[ -n $choice ]] || exit 0
+img=${files[$choice]}
+echo "$img" > ~/.config/i3/.wallpaper
+feh --no-fehbg --bg-fill "$img"
+~/.config/i3/scripts/lock --prepare >/dev/null 2>&1 &   # pre-build the lock background

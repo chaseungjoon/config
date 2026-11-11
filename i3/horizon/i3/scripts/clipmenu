@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# SUPER+P: pick from clipboard history (kept by clipd) and put it back on the clipboard
+. ~/.config/i3/scripts/_env
+store=${XDG_RUNTIME_DIR:-/tmp}/i3-clip.json
+[[ -s $store ]] || { notify-send -a clipboard -i edit-paste "Clipboard" "history is empty"; exit 0; }
+idx=$(python3 -I -c '
+import json, sys
+for h in json.load(open(sys.argv[1])):
+    line = " ".join(h.split())
+    print(line[:140] + ("…" if len(line) > 140 else ""))' "$store" |
+    rofi -dmenu -i -p "󰅎" -format i -no-custom -theme-str 'window {width: 900px;} entry {placeholder: "Clipboard history…";}')
+[[ -n $idx ]] || exit 0
+python3 -I -c 'import json, sys; sys.stdout.write(json.load(open(sys.argv[1]))[int(sys.argv[2])])' "$store" "$idx" |
+    xclip -selection clipboard

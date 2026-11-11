@@ -1,0 +1,385 @@
+;; ┌────────────────────────────────────────────────────────────────────┐
+;; │ eww :: EVENT HORIZON bar — full-width frosted strip, pill modules  │
+;; │  [ 󰀘 · workspaces · title ]   [ clock · media ]   [ apps · ime net bt vol · ⏻ ] │
+;; │ launched by ~/.config/i3/eww/launch (exec_always in i3)            │
+;; └────────────────────────────────────────────────────────────────────┘
+
+(defvar scripts "~/.config/i3/eww/scripts")
+
+;; ── data ────────────────────────────────────────────────────────────────
+(deflisten ws    :initial "{}"                              "~/.config/i3/eww/scripts/i3state ws")
+(deflisten win   :initial "{\"title\":\"\",\"class\":\"\",\"app\":\"\"}" "~/.config/i3/eww/scripts/i3state win")
+(deflisten vol   :initial "{\"vol\":0,\"muted\":false}"     "~/.config/i3/eww/scripts/volume")
+(deflisten media :initial "{\"status\":\"Stopped\",\"text\":\"\",\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"art\":\"\",\"length\":1,\"lenstr\":\"\",\"player\":\"\",\"name\":\"\",\"music\":false,\"shuffle\":false,\"loop\":\"None\",\"canseek\":false,\"w\":300}"
+                 "~/.config/i3/eww/scripts/media")
+;; coding agents (Claude Code / Codex / Copilot) running in terminals: ids here (changes only when a
+;; session starts or ends — a `for` loop rebuilds on every change), details pushed by the
+;; same script into agentinfo every time a state / token count / timer changes
+(deflisten agents :initial "[]" "~/.config/i3/eww/scripts/agents")
+(defvar agentinfo "{}")
+(defvar agent_hover "")   ; id shown in the hover card (scripts/agentcard)
+(deflisten bt   :initial "{\"powered\":false,\"devices\":\"\"}" "~/.config/i3/eww/scripts/bluetooth")
+(deflisten trayn :initial "0"                               "~/.config/i3/eww/scripts/traycount")
+(defpoll net   :interval "5s"  :initial "{\"kind\":\"none\",\"name\":\"\",\"iface\":\"\"}" "~/.config/i3/eww/scripts/net")
+(defpoll dnd   :interval "5s"  :initial "false" "~/.config/i3/eww/scripts/dnd")
+(defpoll ime   :interval "3s"  :initial "EN"    "~/.config/i3/eww/scripts/ime")   ; SUPER+D pushes instantly
+(defpoll hm    :interval "1s"  "date '+%H:%M'")
+(defpoll day   :interval "30s" "date '+%a %d %b'")
+
+(defvar vol_open false)
+
+;; drop-down sheets (scripts/popup keeps these in sync with the open windows)
+(defvar media_open false)
+(defvar cal_open false)
+;; now-playing pill width frozen while a sheet is open (0 = follow media.w)
+(defvar media_wf 0)
+(defvar cal "{\"off\":0,\"title\":\"\",\"wd\":[],\"weeks\":[]}")
+;; local time (with seconds) + the world clock, only polled while the calendar sheet is open
+(defpoll clk :interval "1s" :run-while cal_open
+             :initial "{\"hm\":\"\",\"s\":\"\",\"date\":\"\",\"zone\":\"\",\"utc\":\"\",\"wc\":{\"city\":\"\",\"time\":\"\",\"day\":\"\",\"diff\":\"\",\"night\":false}}"
+  "~/.config/i3/eww/scripts/clock")
+;; playback position + the player's own stream volume, only polled while the music sheet is open
+(defpoll mpos :interval "1s" :run-while media_open
+              :initial "{\"pos\":0,\"posstr\":\"0:00\",\"vol\":100,\"sink\":-1}"
+  "~/.config/i3/eww/scripts/media pos")
+
+;; ── bar ─────────────────────────────────────────────────────────────────
+(defwindow bar [monitor output]
+  :monitor monitor
+  :geometry (geometry :x "0" :y "0" :width "100%" :height "46px" :anchor "top center")
+  ;; override-redirect: i3 would wrap a dock in an opaque frame and kill the
+  ;; transparency, so the bar floats on top and i3 keeps `gaps top` free for it
+  :windowtype "dock"
+  :stacking "fg"
+  :wm-ignore true
+  (bar :output output :monitor monitor))
+
+(defwidget bar [output monitor]
+  (centerbox :class "bar"
+    (box :class "side left" :halign "start" :space-evenly false :spacing 8
+      (launcher)
+      (workspaces :output output)
+      (agentbar)
+      (wintitle))
+    (box :class "middle" :halign "center" :space-evenly false
+      (clock :monitor monitor)
+      (nowplaying :monitor monitor))
+    (box :class "side right" :halign "end" :space-evenly false :spacing 8
+      (apps)
+      (tray)
+      (session))))
+
+;; ── left ────────────────────────────────────────────────────────────────
+(defwidget launcher []
+  (button :class "pill icon-btn launcher"
+          :tooltip "Apps  (super + r)"
+          :onclick "~/.config/i3/bin/rofi -show drun &"
+          :onrightclick "~/.config/i3/scripts/keysheet-open &"
+    (label :text "󰀘")))
+
+(defwidget workspaces [output]
+  (eventbox :onscroll "i3-msg -q workspace $([ {} = up ] && echo prev_on_output || echo next_on_output)"
+    (box :class "pill ws-pill" :space-evenly false :spacing 4
+      (for w in {ws?.[output] ?: []}
+        (button :class "ws ${w.state}"
+                :tooltip "Workspace ${w.name}"
+                :onclick "i3-msg -q workspace number ${w.num}"
+          (label :text "${w.num}"))))))
+
+;; just the focused app, lowercase (google-chrome, spotify, ghostty) — never the window title
+(defwidget wintitle []
+  (revealer :reveal {win.app != ""} :transition "crossfade" :duration "220ms"
+    (box :class "title"
+      (label :class "title-class" :text {win.app}))))
+
+;; one square pill per Claude Code / Codex / Copilot session, coloured by state:
+;; yellow working · red needs you · green finished · grey ready (no turn run yet).
+;; hover = session card (scripts/agentcard, instant), click = jump to its terminal
+(defwidget agentbar []
+  ;; hidden while empty so it doesn't leave a double gap between workspaces and app name
+  (box :class "agents" :visible {arraylength(agents) > 0} :space-evenly false :spacing 6
+    (for a in agents
+      (eventbox :onhover "~/.config/i3/eww/scripts/agentcard show ${a} {0}"
+                :onhoverlost "~/.config/i3/eww/scripts/agentcard hide ${a}"
+        (button :class "pill agent ${agentinfo?.[a]?.state ?: 'ready'}"
+                :onclick "~/.config/i3/eww/scripts/agentcard hide ${a}; i3-msg -q '[id=${agentinfo?.[a]?.wid ?: 0}] focus'"
+          (image :class "agent-icon"
+                 :path "${EWW_CONFIG_DIR}/icons/${agentinfo?.[a]?.kind ?: 'claude'}-${agentinfo?.[a]?.state ?: 'ready'}.${(agentinfo?.[a]?.kind ?: 'claude') == 'codex' ? 'png' : 'svg'}"
+                 :image-width 16 :image-height 16))))))
+
+;; the hover card window: kept open but unmapped, mapped under the hovered icon
+(defwindow agentcard
+  :monitor 0
+  :geometry (geometry :x "-4000px" :y "50px" :width "314px" :height "10px" :anchor "top left")
+  :windowtype "normal"
+  :wm-ignore true
+  :stacking "fg"
+  (box :class "agentcard-win"
+    (agentcard :id agent_hover)))
+
+;; card body. Labels use limit-width 1 so they never widen the fixed 288 px card.
+(defwidget agentcard [id]
+  (box :class "acard ${agentinfo?.[id]?.state ?: 'ready'}" :orientation "v" :space-evenly false :width 288 :spacing 12
+    ;; what: task title (centred), then directory ……… model
+    (box :orientation "v" :space-evenly false :spacing 9
+      (label :class "ac-title" :xalign 0.5 :justify "center" :limit-width 1 :text {agentinfo?.[id]?.title ?: ""})
+      ;; where / what: 󰉋 directory ……… 󰘚 model · effort (outline-only box)
+      (box :class "ac-where" :space-evenly false :spacing 12
+        (box :space-evenly false :spacing 7 :hexpand true
+          (label :class "ac-ico" :text "󰉋")
+          (label :class "ac-dir" :xalign 0 :hexpand true :limit-width 1 :text {agentinfo?.[id]?.proj ?: ""}))
+        (box :space-evenly false :spacing 7
+          (label :class "ac-ico" :text "󰘚")
+          (label :class "ac-model" :text {agentinfo?.[id]?.model ?: ""})
+          (label :class "ac-sep" :visible {(agentinfo?.[id]?.effort ?: "") != ""} :text "·")
+          (label :class "ac-effort" :visible {(agentinfo?.[id]?.effort ?: "") != ""} :text {agentinfo?.[id]?.effort ?: ""}))))
+    ;; state chip + how long it has been in that state
+    (box :class "ac-state" :space-evenly false :spacing 7
+      (label :class "ac-dot" :text "●")
+      (label :class "ac-st" :xalign 0 :limit-width 28 :text {agentinfo?.[id]?.statetext ?: ""})
+      (label :class "ac-since" :hexpand true :xalign 1 :text "for ${agentinfo?.[id]?.since ?: ''}"))
+    ;; context window: how full it is
+    (box :orientation "v" :space-evenly false :spacing 5
+      (box :space-evenly false
+        (label :class "ac-cap" :text "context")
+        (label :class "ac-val" :hexpand true :xalign 1
+               :text "${agentinfo?.[id]?.ctx ?: 0} / ${agentinfo?.[id]?.ctxmax ?: 0}  ·  ${agentinfo?.[id]?.ctxpct ?: 0}%"))
+      (box :class "ac-bar" :width 288
+        (box :class "ac-fill ctx ${agentinfo?.[id]?.ctxlevel ?: 'lo'}" :halign "start" :width {agentinfo?.[id]?.ctxpx ?: 0})))
+    ;; tokens moved over the whole session
+    (box :class "ac-tiles" :space-evenly true :spacing 8
+      (box :class "ac-tile" :orientation "v" :space-evenly false
+        (box :space-evenly false :spacing 5
+          (label :class "ac-arrow out" :text "󰁝")
+          (label :class "ac-num" :text {agentinfo?.[id]?.tout ?: 0}))
+        (label :class "ac-cap" :xalign 0 :text "tokens written"))
+      (box :class "ac-tile" :orientation "v" :space-evenly false
+        (box :space-evenly false :spacing 5
+          (label :class "ac-arrow in" :text "󰁅")
+          (label :class "ac-num" :text {agentinfo?.[id]?.tin ?: 0}))
+        (label :class "ac-cap" :xalign 0 :text "tokens read")))
+    (label :class "ac-hint" :xalign 0.5 :text "click to go to this window")))
+
+;; ── middle ──────────────────────────────────────────────────────────────
+;; clock + now-playing stay one centred group. The clock is a fixed 192 px; the now-playing
+;; pill is a fixed media.w = 300 px wide, so
+;; scripts/popup can compute where both pills are and drop their sheets right on top.
+(defwidget clock [monitor]
+  (button :class "pill clock" :width 192
+          :onclick "~/.config/i3/eww/scripts/popup drop-calendar ${monitor} &"
+    (clockface)))
+
+(defwidget clockface []
+  (box :halign "center" :space-evenly false :spacing 10
+    (label :class "clock-time" :text hm)
+    (label :class "clock-dot" :text "•")
+    (label :class "clock-date" :text day)))
+
+;; Only dedicated music apps reach this pill. The 8 px gap lives inside the
+;; revealer so the clock sits dead centre when nothing is playing.
+(defwidget nowplaying [monitor]
+  (revealer :reveal {media.status == "Playing" || media.status == "Paused"}
+            :transition "slideright" :duration "320ms"
+    (box :space-evenly false
+      (box :width 8)
+      ;; fixed 300 px: buttons on the left, the title centred in the space between the
+      ;; last button and the pill's right end (ellipsized when it doesn't fit)
+      (box :class "pill media ${media.status}" :width 300 :space-evenly false :spacing 2
+        (button :class "media-btn" :tooltip "Previous" :onclick "playerctl -p '${media.player}' previous"
+          (label :text "󰒮"))
+        (button :class "media-btn play" :tooltip "Play / pause" :onclick "playerctl -p '${media.player}' play-pause"
+          (label :text {media.status == "Playing" ? "󰏤" : "󰐊"}))
+        (button :class "media-btn" :tooltip "Next" :onclick "playerctl -p '${media.player}' next"
+          (label :text "󰒭"))
+        (button :class "media-hit" :hexpand true
+                :tooltip "Open ${media.name}"
+                :onclick "~/.config/i3/eww/scripts/popup drop-media ${monitor} &"
+          ;; limit-width 1 = no natural width of its own: the label fills the space and centres
+          (label :class "media-text" :xalign 0.5 :limit-width 1 :text {media.text}))))))
+
+;; ── right ───────────────────────────────────────────────────────────────
+;; background apps (Steam, ChatGPT, ...): the systray in its own pill, only while it has icons.
+;; nm-applet runs with --no-indicator and blueman without its SNI plugin, so neither lands here.
+(defwidget apps []
+  (revealer :reveal {trayn > 0} :transition "slideleft" :duration "300ms"
+    (box :class "pill apps"
+      (systray :spacing 10 :icon-size 16 :prepend-new true))))
+
+;; one pill, right to left: volume · bluetooth · network · language
+(defwidget tray []
+  (box :class "pill tray" :space-evenly false :spacing 12
+    (button :class "ime ${ime == 'EN' ? '' : 'ko'}" :tooltip "Input language  (super + d)"
+            :onclick "~/.config/i3/scripts/ime"
+      (label :text ime))
+    (button :class "net ${net.kind}" :tooltip {net.kind == "none" ? "Offline" : "${net.name}  (${net.iface})"}
+            :onclick "~/.config/i3/scripts/float nmtui &" :onrightclick "nm-connection-editor &"
+      (label :text {net.kind == "wifi" ? "󰖩" : net.kind == "wired" ? "󰈀" : "󰖪"}))
+    (button :class "bt ${!bt.powered ? 'off' : bt.devices != '' ? 'connected' : ''}"
+            :tooltip {!bt.powered ? "Bluetooth off" : bt.devices != "" ? "Bluetooth: ${bt.devices}" : "Bluetooth on"}
+            :onclick "blueman-manager &" :onrightclick "~/.config/i3/eww/scripts/bluetooth toggle &"
+      (label :text {!bt.powered ? "󰂲" : bt.devices != "" ? "󰂱" : "󰂯"}))
+    (eventbox :onhover "${EWW_CMD} update vol_open=true"
+              :onhoverlost "${EWW_CMD} update vol_open=false"
+              :onscroll "wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 2%$([ {} = up ] && echo + || echo -)"
+      (box :class "vol ${vol.muted ? 'muted' : ''}" :space-evenly false :spacing 7
+        (button :onclick "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" :onrightclick "pavucontrol &"
+          (label :class "vol-icon"
+                 :text {vol.muted ? "󰝟" : vol.vol >= 60 ? "󰕾" : vol.vol >= 25 ? "󰖀" : "󰕿"}))
+        (revealer :reveal vol_open :transition "slideleft" :duration "300ms"
+          (scale :class "vol-slider" :min 0 :max 101 :round-digits 0 :value {vol.vol}
+                 :onchange "wpctl set-volume @DEFAULT_AUDIO_SINK@ {}%"))
+        (label :class "vol-text" :text "${vol.vol}%")))))
+
+(defwidget session []
+  (box :class "pill session" :space-evenly false :spacing 2
+    (button :class "icon-btn dnd ${dnd ? 'on' : ''}"
+            :tooltip {dnd ? "Notifications paused" : "Notifications on"}
+            :onclick "~/.config/i3/eww/scripts/dnd toggle"
+      (label :text {dnd ? "󰂛" : "󰂚"}))
+    (button :class "icon-btn power" :tooltip "Session" :onclick "~/.config/i3/scripts/powermenu &"
+      (label :text "󰐥"))))
+
+;; ── drop-down sheets ───────────────────────────────────────────────────────
+;; Opened by scripts/popup with --screen/--pos/--size so each one lands exactly on top of
+;; its pill (same x, same width, same top edge); picom's `Eww - drop` rule unrolls it.
+;; Its first row repeats the pill's face (arrow / clock), so the pill itself seems to
+;; stretch downwards. A click anywhere outside closes it (scripts/dropwatch).
+
+;; the music sheet: fixed 300 px (= the pill). One centred column —
+;;   ˄ · cover · title / artist / album · seek · transport · volume · footer (source + open)
+(defwindow drop-media
+  :monitor 0
+  :geometry (geometry :x "0" :y "7px" :width "300px" :height "10px" :anchor "top left")
+  :windowtype "normal"
+  :wm-ignore true
+  :stacking "fg"
+  (box :class "sheet" :orientation "v" :space-evenly false
+    (button :class "sheet-head" :tooltip "Close"
+            :onclick "~/.config/i3/eww/scripts/popup close drop-media &"
+      (label :class "sheet-arrow" :text "󰅃"))
+    (box :class "sheet-sep")
+    (box :class "music" :orientation "v" :space-evenly false
+      (cover)
+      (trackinfo)
+      (seekbar)
+      (transport)
+      (appvol))
+    (box :class "sheet-sep")
+    (musicfoot)))
+
+(defwidget cover []
+  (box :class "art ${media.art == '' ? 'none' : ''}" :width 220 :height 220 :halign "center"
+       :style {media.art == "" ? "" : "background-image: url('${media.art}');"}
+    (label :class "art-ph" :visible {media.art == ""} :text "󰝚")))
+
+;; labels use limit-width 1 so they never widen the sheet — they ellipsize to fit it
+(defwidget trackinfo []
+  (box :class "m-info" :orientation "v" :space-evenly false
+    (label :class "m-title" :xalign 0.5 :limit-width 1 :text {media.title})
+    (label :class "m-artist" :xalign 0.5 :limit-width 1
+           :text {media.artist == "" ? "Unknown artist" : media.artist})
+    (label :class "m-album" :xalign 0.5 :limit-width 1 :visible {media.album != ""} :text {media.album})))
+
+(defwidget seekbar []
+  (box :class "m-seek" :orientation "v" :space-evenly false
+    (scale :class "seek ${media.canseek ? '' : 'locked'}" :active {media.canseek}
+           :min 0 :max {media.length} :value {mpos.pos} :round-digits 1
+           :onchange "~/.config/i3/eww/scripts/media seek {} &")
+    (box :class "times" :space-evenly false
+      (label :xalign 0 :hexpand true :text {mpos.posstr})
+      (label :xalign 1 :text {media.lenstr}))))
+
+;; five controls, natural widths + even 12 px gaps (equal-width slots would all be as
+;; wide as the play capsule and overflow the 300 px sheet); play/pause = workspace capsule
+(defwidget transport []
+  (box :class "m-transport" :space-evenly false :spacing 12 :halign "center"
+    (button :class "t-btn toggle ${media.shuffle ? 'on' : ''}" :halign "center"
+            :tooltip {media.shuffle ? "Shuffle: on" : "Shuffle: off"}
+            :onclick "playerctl -p '${media.player}' shuffle toggle"
+      (label :text "󰒟"))
+    (button :class "t-btn skip" :halign "center" :tooltip "Previous" :onclick "playerctl -p '${media.player}' previous"
+      (label :text "󰒮"))
+    (button :class "t-btn play" :halign "center" :tooltip "Play / pause" :onclick "playerctl -p '${media.player}' play-pause"
+      (label :text {media.status == "Playing" ? "󰏤" : "󰐊"}))
+    (button :class "t-btn skip" :halign "center" :tooltip "Next" :onclick "playerctl -p '${media.player}' next"
+      (label :text "󰒭"))
+    (button :class "t-btn toggle ${media.loop == 'None' ? '' : 'on'}" :halign "center"
+            :tooltip {media.loop == "Track" ? "Repeat: one" : media.loop == "Playlist" ? "Repeat: all" : "Repeat: off"}
+            :onclick "playerctl -p '${media.player}' loop ${media.loop == 'None' ? 'Playlist' : media.loop == 'Playlist' ? 'Track' : 'None'}"
+      (label :text {media.loop == "Track" ? "󰑘" : "󰑖"}))))
+
+;; this app's own volume (its pulse stream, independent of the system volume)
+(defwidget appvol []
+  (box :class "m-vol ${mpos.sink < 0 ? 'nosink' : ''}" :space-evenly false :spacing 10
+    (label :class "av-icon" :text {mpos.vol == 0 ? "󰝟" : mpos.vol >= 60 ? "󰕾" : mpos.vol >= 25 ? "󰖀" : "󰕿"})
+    (scale :class "av-slider" :hexpand true :min 0 :max 101 :round-digits 0 :value {mpos.vol}
+           :active {mpos.sink >= 0}
+           :onchange "~/.config/i3/eww/scripts/media vol {} && ${EWW_CMD} update mpos=\"$(~/.config/i3/eww/scripts/media pos)\"")
+    (label :class "av-text" :xalign 1 :text "${mpos.vol}%")))
+
+;; footer, mirroring the header: which app is playing + jump to it
+(defwidget musicfoot []
+  (button :class "m-foot" :tooltip "Show ${media.name}"
+          :onclick "~/.config/i3/eww/scripts/popup close drop-media; ~/.config/i3/eww/scripts/media focus &"
+    (box :space-evenly false :spacing 7
+      (label :class "m-dot ${media.status}" :text "●")
+      (label :class "m-src" :xalign 0 :hexpand true :limit-width 1
+             :text "${media.status == 'Playing' ? 'playing' : 'paused'} on ${media.name}")
+      (label :class "m-open" :text "open")
+      (label :class "m-go" :text "󰁔"))))
+
+;; the calendar sheet: as wide as the clock pill (192 px). One centred column —
+;;   ˄ · local time · world clock (click: next city) · month · footer (zone + today)
+(defwindow drop-calendar
+  :monitor 0
+  :geometry (geometry :x "0" :y "7px" :width "192px" :height "10px" :anchor "top left")
+  :windowtype "normal"
+  :wm-ignore true
+  :stacking "fg"
+  ;; closes like the music sheet: the ˄ row, or a click anywhere outside (scripts/dropwatch)
+  (box :class "sheet" :orientation "v" :space-evenly false
+      (button :class "sheet-head" :tooltip "Close"
+              :onclick "~/.config/i3/eww/scripts/popup close drop-calendar &"
+        (label :class "sheet-arrow" :text "󰅃"))
+      (box :class "sheet-sep")
+      (box :class "cal-body" :orientation "v" :space-evenly false
+        ;; now: big HH:MM, the seconds ticking beside it, the date under it
+        (box :class "c-now" :orientation "v" :space-evenly false
+          (box :halign "center" :space-evenly false :spacing 3
+            (label :class "c-hm" :text {clk.hm})
+            (label :class "c-s" :valign "end" :text {clk.s}))
+          (label :class "c-date" :text {clk.date}))
+        ;; world clock tile — click to choose the city (scripts/worldclock-pick)
+        (button :class "c-world ${clk.wc.night ? 'night' : 'day'}" :tooltip "Choose a city"
+                :onclick "~/.config/i3/eww/scripts/worldclock-pick &"
+          (box :space-evenly false :spacing 9
+            (label :class "c-wicon" :valign "center" :text {clk.wc.night ? "󰖔" : "󰖙"})
+            (box :orientation "v" :space-evenly false :hexpand true :valign "center"
+              (label :class "c-city" :xalign 0 :limit-width 1 :text {clk.wc.city})
+              (label :class "c-wmeta" :xalign 0 :limit-width 1 :text "${clk.wc.day} · ${clk.wc.diff}"))
+            (label :class "c-wtime" :valign "center" :text {clk.wc.time})))
+        ;; month
+        (box :class "calendar" :orientation "v" :space-evenly false
+          (box :class "cal-nav" :space-evenly false
+            (button :class "cal-arrow" :onclick "${EWW_CMD} update cal=\"$(~/.config/i3/eww/scripts/calendar ${cal.off - 1})\""
+              (label :text "󰅁"))
+            (button :class "cal-title" :hexpand true :tooltip "Back to today"
+                    :onclick "${EWW_CMD} update cal=\"$(~/.config/i3/eww/scripts/calendar 0)\""
+              (label :text {cal.title}))
+            (button :class "cal-arrow" :onclick "${EWW_CMD} update cal=\"$(~/.config/i3/eww/scripts/calendar ${cal.off + 1})\""
+              (label :text "󰅂")))
+          (box :class "cal-row cal-wd" :homogeneous true
+            (for d in {cal.wd}
+              (label :class "cal-w ${d.c}" :text {d.t})))
+          (for w in {cal.weeks}
+            (box :class "cal-row" :homogeneous true
+              (for d in w
+                (label :class "cal-day ${d.c}" :text {d.d}))))))
+      (box :class "sheet-sep")
+      ;; footer, mirroring the header: your zone + back to this month
+      (button :class "c-foot" :tooltip "Back to today"
+              :onclick "${EWW_CMD} update cal=\"$(~/.config/i3/eww/scripts/calendar 0)\""
+        (box :space-evenly false :spacing 6
+          (label :class "c-dot" :text "●")
+          (label :class "c-zone" :xalign 0 :hexpand true :limit-width 1 :text "${clk.zone} · ${clk.utc}")
+          (label :class "c-today ${cal.off == 0 ? '' : 'away'}" :text "today")))))

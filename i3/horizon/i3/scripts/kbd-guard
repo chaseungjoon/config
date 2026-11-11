@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Pins the keyboard mapping for the whole session:
+#   CapsLock = Super, Win = Win, Ctrl = Ctrl  (+ the Keychron Alt<->Win swap, Ctrl+Alt+Bksp)
+#
+# Why: X hands every newly (re)connected keyboard the *system* default from
+# /etc/default/keyboard (XKBOPTIONS="ctrl:swap_lwin_lctl"), which silently replaces these
+# options — Ctrl and Win swap and CapsLock stops being Super. The Keychron drops and
+# re-enumerates now and then, so that kept happening. Every device add (and every
+# setxkbmap from anything else) rewrites the root property _XKB_RULES_NAMES; we watch it
+# and put our options back whenever they differ. Runs from i3 exec_always; a new instance
+# replaces the old one.
+
+OPTS=(altwin:swap_alt_win caps:super terminate:ctrl_alt_bksp)
+WANT=$(IFS=,; echo "${OPTS[*]}")
+PIDFILE=${XDG_RUNTIME_DIR:-/tmp}/kbd-guard.pid
+LOG=${XDG_RUNTIME_DIR:-/tmp}/kbd-guard.log
+
+if [[ -r $PIDFILE ]]; then
+    old=$(<"$PIDFILE")
+    [[ -n $old && $old != "$$" ]] && { pkill -TERM -P "$old"; kill "$old"; } 2>/dev/null
+fi
+echo $$ >"$PIDFILE"
+trap 'pkill -TERM -P $$ 2>/dev/null; exit 0' TERM INT
+trap 'pkill -TERM -P $$ 2>/dev/null' EXIT
+
+apply() {
+    local args=(-layout us -option '')
+    for o in "${OPTS[@]}"; do args+=(-option "$o"); done
+    setxkbmap "${args[@]}"
+    xset r rate 250 40          # a re-added keyboard also comes back with the default repeat rate
+}
+
+current() { setxkbmap -query 2>/dev/null | awk '/^options:/{print $2}'; }
+
+apply
+echo "$(date '+%F %T') start, options=$(current)" >>"$LOG"
+
+# xprop -spy prints the property now and on every change
+xprop -root -spy _XKB_RULES_NAMES 2>/dev/null | while read -r _; do
+    sleep 0.15                  # a reconnect adds several devices back to back; let them land
+    got=$(current)
+    if [[ $got != "$WANT" ]]; then
+        apply
+        echo "$(date '+%F %T') reset: '$got' -> '$(current)'" >>"$LOG"
+    fi
+done

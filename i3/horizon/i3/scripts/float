@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# open a TUI in a floating ghostty (bar click actions): class ghostty.tui = 110x40 cells, see the i3 rule
+command -v "$1" >/dev/null || { notify-send -a bar "$1 is not installed"; exit 1; }
+exec setsid -f ghostty --window-decoration=none --class=ghostty.tui -e "$@" >/dev/null 2>&1

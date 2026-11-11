@@ -1,0 +1,42 @@
+/* world-clock city picker: the drop-down sheets' look (70 % blue glass, hairline, 16 px corners),
+   docked beside the calendar sheet by scripts/worldclock-pick */
+@import "~/.config/i3/rofi/horizon.rasi"
+
+* {
+    sheet:    #17223fb3;   /* = $sheet-bg in eww.scss: #17223f at 70 % */
+    sheetline:#7d98ff29;
+}
+window {
+    width:            400px;
+    background-color: @sheet;
+    border:           1px;
+    border-color:     @sheetline;
+    border-radius:    16px;
+}
+mainbox  { padding: 12px; spacing: 10px; children: [ inputbar, listview ]; }
+inputbar {
+    padding:          9px 12px;
+    spacing:          10px;
+    background-color: #ffffff0b;
+    border:           1px;
+    border-color:     #ffffff12;
+    border-radius:    11px;
+    children:         [ prompt, entry ];
+}
+prompt   { text-color: #7d98ff; font: "JetBrainsMono Nerd Font Propo 13"; }
+/* one property per line: rofi 1.7's parser merges two quoted strings on one line */
+entry {
+    placeholder:       "Search a city or country";
+    placeholder-color: @muted;
+    font:              "Inter SemiBold 11";
+}
+listview { lines: 11; spacing: 2px; fixed-height: true; scrollbar: false; }
+element {
+    padding:       7px 10px;
+    border-radius: 10px;
+    font:          "Inter Medium 10.5";
+}
+element normal.normal, element alternate.normal { background-color: transparent; text-color: @text; }
+element selected.normal { background-color: #2b5cff47; text-color: @text; }
+element-icon { size: 0; }
+element-text { highlight: bold #ffffff; }

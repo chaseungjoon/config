@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+# eww listener: {"powered": bool, "devices": "name, name"} (connected devices) on every bluez change.
+# `bluetooth toggle` flips the adapter power instead.
+import json, subprocess, sys
+from gi.repository import Gio, GLib
+
+if sys.argv[1:] == ["toggle"]:
+    on = "Powered: yes" in subprocess.run(["bluetoothctl", "show"], capture_output=True, text=True).stdout
+    subprocess.run(["bluetoothctl", "power", "off" if on else "on"], capture_output=True)
+    sys.exit()
+
+bus = Gio.bus_get_sync(Gio.BusType.SYSTEM)
+last = None
+
+def emit(*_):
+    global last
+    try:
+        objs = bus.call_sync("org.bluez", "/", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects",
+                             None, None, 0, 1000, None).unpack()[0]
+    except GLib.Error:
+        objs = {}
+    powered = any(i.get("org.bluez.Adapter1", {}).get("Powered") for i in objs.values())
+    devices = sorted(d["Alias"] for i in objs.values() if (d := i.get("org.bluez.Device1")) and d.get("Connected"))
+    cur = json.dumps({"powered": powered, "devices": ", ".join(devices)})
+    if cur != last:
+        print(cur, flush=True)
+        last = cur
+
+for member in ("PropertiesChanged", "InterfacesAdded", "InterfacesRemoved"):
+    bus.signal_subscribe("org.bluez", None, member, None, None, 0, emit)
+bus.signal_subscribe("org.freedesktop.DBus", "org.freedesktop.DBus", "NameOwnerChanged", None, "org.bluez", 0, emit)
+emit()
+GLib.MainLoop().run()

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Toggle an eww drop-down sheet that unrolls out of its own bar pill.
+#   popup drop-media    [monitor]   music sheet under the now-playing pill
+#   popup drop-calendar [monitor]   calendar sheet under the clock pill
+#   popup close         [name]      close one sheet (or every sheet)
+# A sheet sits exactly on top of its pill (same x, same width, top at the pill's top edge)
+# so the pill looks like it is being pulled down; picom's `Eww - drop` rule animates the
+# unroll. The clock is a fixed CLOCK_W; the now-playing pill is as wide as its text
+# (media.w from scripts/media) and is frozen at that width while any sheet is open, so a
+# track change can't slide the pills out from under their sheets. A click anywhere
+# outside an open sheet closes it (scripts/dropwatch).
+# Keep CLOCK_W / GAP / PILL_Y in sync with eww.yuck + eww.scss.
+eww=~/.config/i3/bin/eww
+dir=~/.config/i3/eww/scripts
+CLOCK_W=192   # clock pill width
+GAP=8         # clock <-> now-playing gap (margin on the now-playing pill)
+PILL_Y=7      # .pill top margin inside the 46px bar
+
+# one popup action at a time: an outside click (dropwatch) and a pill click can land together
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/eww-popup.lock"
+flock 9
+
+var() { case $1 in drop-media) echo media_open ;; drop-calendar) echo cal_open ;; esac; }
+
+open_drops() { $eww active-windows 2>/dev/null | grep -o '^\(drop\|pop\)-[a-z]*'; }
+
+close() {
+    local w v
+    for w in "$@"; do
+        pkill -f "eww/scripts/dropwatch $w\$" 2>/dev/null
+        v=$(var "$w"); [[ -n $v ]] && $eww update "$v=false"
+        $eww close "$w" >/dev/null 2>&1
+    done
+    [[ -z $(open_drops) ]] && $eww update media_wf=0
+}
+
+if [[ $1 == close ]]; then
+    if [[ -n $2 ]]; then close "$2"; else close $(open_drops); fi
+    exit
+fi
+
+name=$1 mon=${2:-0}
+# already open -> this click closes it
+if open_drops | grep -qx "$name"; then close "$name"; exit; fi
+others=$(open_drops)
+[[ -n $others ]] && close $others
+
+# monitor width (same ordering launch uses for the bars)
+mw=$(xrandr --listactivemonitors | awk -v i="$mon" 'NR>1 && $1==i":" {split($3,a,"/"); print a[1]}')
+mw=${mw:-$(xrandr --listactivemonitors | awk 'NR==2 {split($3,a,"/"); print a[1]}')}
+
+# the middle box (clock + now-playing) is centred on the monitor
+read -r st w < <($eww get media 2>/dev/null | jq -r '"\(.status) \(.w // 240)"')
+playing=false; [[ $st == Playing || $st == Paused ]] && playing=true
+if $playing; then mid=$((CLOCK_W + GAP + w)); else mid=$CLOCK_W; fi
+left=$(( (mw - mid) / 2 ))
+
+case $name in
+    drop-media)
+        $playing || exit 0
+        x=$((left + CLOCK_W + GAP)); sw=$w
+        $eww update mpos="$($dir/media pos)" ;;
+    drop-calendar)
+        x=$left; sw=$CLOCK_W
+        $eww update cal="$($dir/calendar 0)" clk="$($dir/clock)" ;;
+    *)  exec $eww open "$name" ;;
+esac
+
+$playing && $eww update media_wf="$w"
+$eww update "$(var "$name")=true"
+$eww open "$name" --screen "$mon" --pos "${x}x${PILL_Y}" --size "${sw}x10"
+setsid -f "$dir/dropwatch" "$name" >/dev/null 2>&1 9>&-

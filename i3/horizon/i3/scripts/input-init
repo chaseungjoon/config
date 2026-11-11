@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# libinput pointers: GNOME-equivalent speed (-0.19, default accel profile), natural scroll off
+for id in $(xinput list --id-only 2>/dev/null); do
+    xinput list-props "$id" 2>/dev/null | grep -q 'libinput Accel Speed (' || continue
+    xinput set-prop "$id" 'libinput Accel Speed' -0.19 2>/dev/null
+    xinput set-prop "$id" 'libinput Natural Scrolling Enabled' 0 2>/dev/null
+done
+exit 0

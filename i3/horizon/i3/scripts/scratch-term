@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# quake-style dropdown terminal on SUPER+`
+. ~/.config/i3/scripts/_env
+if xdotool search --classname '^dropdown$' >/dev/null 2>&1; then
+    i3-msg -q '[instance="^dropdown$"] scratchpad show, move position center'
+else
+    ghostty --window-decoration=none --class=ghostty.dropdown --x11-instance-name=dropdown &
+    for _ in $(seq 40); do xdotool search --classname '^dropdown$' >/dev/null 2>&1 && break; sleep 0.05; done
+    i3-msg -q '[instance="^dropdown$"] move scratchpad, scratchpad show, move position center'
+fi

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# (re)start the autotiler exactly once — safe to call from exec_always
+pkill -f 'i3/scripts/autotiling$' 2>/dev/null
+exec ~/.config/i3/scripts/autotiling

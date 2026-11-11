@@ -1,0 +1,20 @@
+#!/bin/sh
+# Shim for tools that were unpacked into ~/.local/opt/i3-extras (no sudo on this box).
+# Prefers the system binary once it exists, so `sudo apt install <pkg>` just takes over.
+name=$(basename "$0")
+real=$name
+[ "$name" = unclutter ] && real=unclutter-xfixes
+# rofi always gets the EVENT HORIZON config unless a caller passes its own
+if [ "$name" = rofi ]; then
+    case " $* " in *" -config "*) ;; *) set -- -config "$HOME/.config/i3/rofi/config.rasi" "$@" ;; esac
+fi
+for p in /usr/bin/$real /usr/local/bin/$real; do
+    [ -x "$p" ] && exec "$p" "$@"
+done
+root=$HOME/.local/opt/i3-extras/root
+case $name in
+    polkit-agent) exec "$root/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1" "$@" ;;
+    picom|maim|slop) export LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+    arandr) export PYTHONPATH="$root/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}" ;;
+esac
+exec "$root/usr/bin/$real" "$@"

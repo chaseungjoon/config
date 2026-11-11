@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+# dropwatch <window>: close an eww drop-down sheet on the first mouse click outside it.
+# Started by scripts/popup when a sheet opens, killed when it closes. It listens to raw
+# XInput2 button presses (they never steal the click — whatever you clicked still gets it),
+# then compares the pointer with the sheet window's current geometry.
+import os, re, subprocess, sys
+
+name = sys.argv[1]
+POPUP = os.path.expanduser("~/.config/i3/eww/scripts/popup")
+# while a picker opened from a sheet is up (the world-clock city list), clicks belong to it
+PICKING = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "eww-picking")
+
+
+def sh(*a):
+    return subprocess.run(a, capture_output=True, text=True).stdout
+
+
+def sheet_rect():
+    wid = sh("xdotool", "search", "--name", f"^Eww - {name}$").split()
+    if not wid:
+        return None
+    g = dict(l.split("=", 1) for l in sh("xdotool", "getwindowgeometry", "--shell", wid[0]).split() if "=" in l)
+    return int(g["X"]), int(g["Y"]), int(g["WIDTH"]), int(g["HEIGHT"])
+
+
+xi = subprocess.Popen(["stdbuf", "-oL", "xinput", "test-xi2", "--root"],
+                      stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+pressed = False
+for line in xi.stdout:
+    if "(RawButtonPress)" in line:
+        pressed = True
+        continue
+    if not pressed or "detail:" not in line:
+        continue
+    pressed = False
+    if int(line.split()[-1]) not in (1, 2, 3):   # wheel / side buttons don't count
+        continue
+    if os.path.exists(PICKING):
+        continue
+    r = sheet_rect()
+    if r is None:
+        break
+    m = dict(l.split("=", 1) for l in sh("xdotool", "getmouselocation", "--shell").split() if "=" in l)
+    x, y = int(m["X"]), int(m["Y"])
+    if not (r[0] <= x < r[0] + r[2] and r[1] <= y < r[1] + r[3]):
+        subprocess.Popen([POPUP, "close", name], start_new_session=True)
+        break
+xi.kill()

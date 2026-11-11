@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Time data for the calendar drop-down (polled every second while it is open):
+#   clock          -> {"hm","s","date","zone","utc","wc":{"city","time","day","diff","night"}}
+# The city comes from eww/worldclock.conf (chosen with scripts/worldclock-pick).
+conf=~/.config/i3/eww/worldclock.conf
+
+mapfile -t cities < <(sed -n 's/^[[:space:]]*\([^#=][^=]*[^[:space:]=]\)[[:space:]]*=[[:space:]]*\([^[:space:]]*\).*/\1|\2/p' "$conf" 2>/dev/null)
+((${#cities[@]})) || cities=("New York|America/New_York")
+i=0
+i=$(( i % ${#cities[@]} ))
+city=${cities[$i]%%|*} zone=${cities[$i]#*|}
+
+now=$(date +%s)
+read -r hm s dname lz lday <<<"$(date -d "@$now" '+%H:%M %S %A %z %Y%m%d')"
+date_long=$(date -d "@$now" '+%A, %-d %B')
+read -r wt wh wd wz wday <<<"$(TZ=$zone date -d "@$now" '+%H:%M %H %a %z %Y%m%d')"
+
+mins() { local z=$1 sign=1; [[ ${z:0:1} == - ]] && sign=-1; echo $(( sign * (10#${z:1:2} * 60 + 10#${z:3:2}) )); }
+d=$(( $(mins "$wz") - $(mins "$lz") ))
+if (( d == 0 )); then diff="same time"
+else
+    a=${d#-}; sgn=$([[ $d -lt 0 ]] && echo "−" || echo "+")
+    diff="$sgn$((a / 60))h"; (( a % 60 )) && diff="$diff $((a % 60))m"
+fi
+(( wday > lday )) && wd="$wd · tomorrow"
+(( wday < lday )) && wd="$wd · yesterday"
+night=false; (( 10#$wh < 6 || 10#$wh >= 18 )) && night=true
+
+lzone=$(timedatectl show -p Timezone --value 2>/dev/null); lzone=${lzone:-local}
+utc="UTC${lz:0:1}$((10#${lz:1:2}))"; [[ ${lz:3:2} != 00 ]] && utc="$utc:${lz:3:2}"
+jq -cn --arg hm "$hm" --arg s "$s" --arg date "$date_long" --arg zone "${lzone##*/}" --arg utc "$utc" \
+       --arg city "$city" --arg time "$wt" --arg day "$wd" --arg diff "$diff" --argjson night "$night" \
+   '{hm:$hm, s:$s, date:$date, zone:($zone|gsub("_";" ")), utc:$utc,
+     wc:{city:$city, time:$time, day:$day, diff:$diff, night:$night}}'

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# SUPER+ENTER: open a window in the resident ghostty (~60 ms instead of a ~400 ms cold start).
+# falls back to starting the resident instance if it isn't running yet
+ghostty +new-window >/dev/null 2>&1 && exit 0
+setsid -f ghostty --gtk-single-instance=true --initial-window=false --quit-after-last-window-closed=false >/dev/null 2>&1
+for _ in $(seq 30); do sleep 0.1; ghostty +new-window >/dev/null 2>&1 && exit 0; done
+exec ghostty

@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+# Select PowerMizer "Prefer Maximum Performance" for the whole session.
+# On driver 595 the mode is tied to the X client that set it: `nvidia-settings -a ...`
+# reverts the moment it exits. So this process sets it via libXNVCtrl and then just
+# stays connected. Kill it to go back to adaptive clocks.
+import ctypes, signal, sys
+
+NV_CTRL_TARGET_TYPE_GPU = 1
+NV_CTRL_GPU_POWER_MIZER_MODE = 334
+PREFER_MAX = 1
+
+x11 = ctypes.CDLL("libX11.so.6")
+nv = ctypes.CDLL("libXNVCtrl.so.0")
+x11.XOpenDisplay.restype = ctypes.c_void_p
+x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+x11.XFlush.argtypes = [ctypes.c_void_p]
+x11.XConnectionNumber.argtypes = [ctypes.c_void_p]
+nv.XNVCTRLSetTargetAttributeAndGetStatus.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                                     ctypes.c_uint, ctypes.c_uint, ctypes.c_int]
+nv.XNVCTRLQueryTargetAttribute.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                           ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_int)]
+
+dpy = x11.XOpenDisplay(None)
+if not dpy:
+    sys.exit("gpu-perf: cannot open display")
+if not nv.XNVCTRLSetTargetAttributeAndGetStatus(dpy, NV_CTRL_TARGET_TYPE_GPU, 0, 0,
+                                                NV_CTRL_GPU_POWER_MIZER_MODE, PREFER_MAX):
+    sys.exit("gpu-perf: NV-CONTROL refused the PowerMizer mode")
+x11.XFlush(dpy)
+if "--check" in sys.argv:
+    v = ctypes.c_int()
+    nv.XNVCTRLQueryTargetAttribute(dpy, NV_CTRL_TARGET_TYPE_GPU, 0, 0, NV_CTRL_GPU_POWER_MIZER_MODE, ctypes.byref(v))
+    print("PowerMizer mode:", v.value)
+# stay connected (the setting lives as long as this client); exit with the X session
+import select
+fd = x11.XConnectionNumber(dpy)
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+while True:
+    r, _, _ = select.select([fd], [], [])
+    try:
+        import os
+        if not os.read(fd, 4096):
+            break            # X server went away
+    except OSError:
+        break

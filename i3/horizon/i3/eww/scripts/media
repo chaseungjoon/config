@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+# eww media backend (MPRIS over D-Bus, no playerctl follow loop)
+#
+#   media            listener: one JSON line per change for a music app
+#                    (the one that most recently started playing; else the most recently
+#                    active paused one). Fields: status text title artist album art length
+#                    lenstr player name music shuffle loop canseek w
+#                    (w = the bar pill's fixed pixel width, for scripts/popup)
+#   media pos        {"pos": s, "posstr": "1:23", "vol": 0-100, "sink": id|-1} (polled while open)
+#   media seek S     jump to S seconds
+#   media vol N      set the player's own audio stream (pulse sink-input) to N %
+#   media focus      focus the music app's window
+#
+# The listener drops the followed player into $XDG_RUNTIME_DIR/eww-media.json for the
+# one-shot commands. Album art (Spotify serves https URLs) is cached in ~/.cache/eww-art.
+import hashlib, json, os, re, shutil, subprocess, sys, threading, time
+import urllib.request
+
+STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "eww-media.json")
+ART_DIR = os.path.expanduser("~/.cache/eww-art")
+PREFIX = "org.mpris.MediaPlayer2."
+PATH = "/org/mpris/MediaPlayer2"
+
+# Only follow dedicated music apps. Browser MPRIS players (including music sites and
+# browser-installed web apps) never enter the bar's player selection.
+MUSIC_APPS = re.compile(
+    r"(?:^|[._-])(?:spotify|spotify_player|ncspot|cmus|rhythmbox|strawberry|"
+    r"youtube[-_]?music|tidal|deezer|audacious|amarok|clementine|lollypop|"
+    r"elisa|amberol|quodlibet|deadbeef|mpd|mopidy|cantata|pragha|tauonmb|"
+    r"feishin|nuclear|cider|harmonoid|sonixd|supersonic|musikcube|resonance|gapless)"
+    r"(?:$|[._-])", re.I)
+BROWSERS = re.compile(
+    r"(?:^|[._-])(?:chrome|chromium|google-chrome|firefox|brave|vivaldi|opera|edge|msedge|"
+    r"microsoft-edge|zen|librewolf|waterfox|floorp|thorium|arc|qutebrowser|"
+    r"epiphany|midori|falkon|palemoon|pale-moon|seamonkey|tor-browser|"
+    r"torbrowser|duckduckgo|nyxt|luakit|surf)(?:$|[._-])", re.I)
+
+
+def music_app(bus_name):
+    short = bus_name[len(PREFIX):]
+    return not BROWSERS.search(short) and bool(MUSIC_APPS.search(short))
+
+
+# the now-playing pill (and its music drop-down) is a fixed width; scripts/popup reads it as
+# media.w to lay the sheet exactly over the pill
+PILL_W = 300
+
+
+def fmt(sec):
+    sec = max(0, int(sec))
+    h, m, s = sec // 3600, sec // 60 % 60, sec % 60
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def current():
+    try:
+        with open(STATE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+# ── pulse helpers (per-app volume) ───────────────────────────────────────────
+def sink_input(cur):
+    """the pulse sink-input that belongs to the followed player, or None"""
+    try:
+        items = json.loads(subprocess.run(["pactl", "-f", "json", "list", "sink-inputs"],
+                                          capture_output=True, text=True, timeout=2).stdout or "[]")
+    except (ValueError, subprocess.SubprocessError, OSError):
+        return None
+    keys = {k.lower() for k in (cur.get("identity"), cur.get("desktop"), cur.get("player", "").split(".")[0]) if k}
+    for it in items:
+        p = it.get("properties", {})
+        names = {str(p.get(k, "")).lower() for k in ("application.name", "application.process.binary",
+                                                      "application.id", "node.name")}
+        if keys & names:
+            return it
+    return None
+
+
+def cmd_pos():
+    cur = current()
+    pos = 0.0
+    if cur.get("player"):
+        r = subprocess.run(["playerctl", "-p", cur["player"], "position"], capture_output=True, text=True)
+        try:
+            pos = float(r.stdout.strip() or 0)
+        except ValueError:
+            pos = 0.0
+    vol, sink = 100, -1
+    it = sink_input(cur) if cur.get("player") else None
+    if it:
+        sink = it["index"]
+        chans = it.get("volume", {}).values()
+        pcts = [int(str(c.get("value_percent", "100%")).rstrip("%")) for c in chans] or [100]
+        vol = round(sum(pcts) / len(pcts))
+    print(json.dumps({"pos": round(pos, 1), "posstr": fmt(pos), "vol": vol, "sink": sink}))
+
+
+def cmd_vol(n):
+    it = sink_input(current())
+    if it:
+        subprocess.run(["pactl", "set-sink-input-volume", str(it["index"]), f"{max(0, min(150, int(float(n))))}%"])
+
+
+def cmd_seek(s):
+    # dragging the progress bar fires this on every pixel: only the last call within
+    # 180 ms actually seeks, so the player isn't hammered with seeks mid-drag
+    token = f"{os.getpid()}"
+    lock = STATE + ".seek"
+    with open(lock, "w") as f:
+        f.write(token)
+    time.sleep(0.18)
+    try:
+        with open(lock) as f:
+            if f.read() != token:
+                return
+    except OSError:
+        return
+    cur = current()
+    if cur.get("player"):
+        subprocess.run(["playerctl", "-p", cur["player"], "position", str(max(0.0, float(s)))])
+
+
+def cmd_focus():
+    cur = current()
+    if not cur.get("player"):
+        return
+    def i3(crit):
+        r = subprocess.run(["i3-msg", f"{crit} focus"], capture_output=True, text=True)
+        return '"success":true' in r.stdout
+    title = cur.get("title", "")
+    app = cur.get("desktop") or cur.get("identity") or cur["player"].split(".")[0]
+    app = re.sub(r"^(com|org|io|net)\..*\.", "", app)
+    if title and i3(f'[title="{re.escape(title).replace(chr(34), chr(92) + chr(34))}"]'):
+        return
+    if app and i3(f'[class="(?i)^{re.escape(app)}$"]'):
+        return
+    # not mapped (closed to tray, other workspace scratchpad, ...): ask the player itself
+    subprocess.run(["gdbus", "call", "--session", "--dest", PREFIX + cur["player"], "--object-path", PATH,
+                    "--method", "org.mpris.MediaPlayer2.Raise"], capture_output=True)
+
+
+# ── listener ─────────────────────────────────────────────────────────────────
+def listen():
+    from gi.repository import Gio, GLib
+
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+    players = {}      # bus name -> dict
+    owners = {}       # unique name (:1.42) -> bus name
+    art_jobs = set()
+    last = [None]
+
+    def call(name, iface, method, args=None, sig=None):
+        try:
+            return bus.call_sync(name, PATH, iface, method, args, sig, 0, 800, None).unpack()
+        except GLib.Error:
+            return None
+
+    def get_all(name, iface):
+        r = call(name, "org.freedesktop.DBus.Properties", "GetAll", GLib.Variant("(s)", (iface,)))
+        return r[0] if r else {}
+
+    def art_path(url):
+        if not url:
+            return ""
+        if url.startswith("file://"):
+            p = urllib.request.url2pathname(url[7:])
+            return p if os.path.exists(p) else ""
+        if not url.startswith(("http://", "https://")):
+            return ""
+        dst = os.path.join(ART_DIR, hashlib.sha1(url.encode()).hexdigest()[:20] + ".img")
+        if os.path.exists(dst):
+            return dst
+        if url not in art_jobs:
+            art_jobs.add(url)
+
+            def fetch():
+                try:
+                    os.makedirs(ART_DIR, exist_ok=True)
+                    tmp = dst + ".part"
+                    with urllib.request.urlopen(url, timeout=8) as r, open(tmp, "wb") as f:
+                        shutil.copyfileobj(r, f)
+                    os.replace(tmp, dst)
+                except OSError:
+                    pass
+                GLib.idle_add(lambda: emit() and False)
+            threading.Thread(target=fetch, daemon=True).start()
+        return ""
+
+    def update(name, props):
+        p = players.setdefault(name, {"status": "Stopped", "meta": {}, "since": 0.0})
+        if "PlaybackStatus" in props and props["PlaybackStatus"] != p["status"]:
+            p["status"] = props["PlaybackStatus"]
+            p["since"] = time.monotonic()
+        if "Metadata" in props:
+            p["meta"] = props["Metadata"] or {}
+            if p["status"] == "Playing":
+                p["since"] = time.monotonic()
+        for k in ("Shuffle", "LoopStatus", "CanSeek", "Identity", "DesktopEntry"):
+            if k in props:
+                p[k] = props[k]
+
+    def add(name):
+        players[name] = {"status": "Stopped", "meta": {}, "since": 0.0}
+        update(name, get_all(name, "org.mpris.MediaPlayer2"))
+        update(name, get_all(name, "org.mpris.MediaPlayer2.Player"))
+        players[name]["since"] = time.monotonic() if players[name]["status"] == "Playing" else 0.0
+        try:
+            o = bus.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+                              "GetNameOwner", GLib.Variant("(s)", (name,)), None, 0, 800, None).unpack()[0]
+            owners[o] = name
+        except GLib.Error:
+            pass
+
+    def pick():
+        live = [(n, p) for n, p in players.items()
+                if music_app(n) and p["status"] in ("Playing", "Paused")]
+        if not live:
+            return None, None
+        # playing beats paused, then whichever started most recently
+        live.sort(key=lambda np: (np[1]["status"] == "Playing", np[1]["since"]), reverse=True)
+        return live[0]
+
+    def emit():
+        name, p = pick()
+        if not p:
+            out = {"status": "Stopped", "text": "", "title": "", "artist": "", "album": "", "art": "",
+                   "length": 1, "lenstr": "0:00", "player": "", "name": "", "music": False,
+                   "shuffle": False, "loop": "None", "canseek": False, "w": PILL_W}
+            cur = {}
+        else:
+            m = p["meta"]
+            artist = m.get("xesam:artist") or []
+            artist = ", ".join(artist) if isinstance(artist, list) else str(artist)
+            title = str(m.get("xesam:title") or "")
+            length = (m.get("mpris:length") or 0) / 1e6
+            short = name[len(PREFIX):]
+            ident = str(p.get("Identity") or short.split(".")[0])
+            desk = str(p.get("DesktopEntry") or "")
+            out = {
+                "status": p["status"],
+                "text": f"{artist} — {title}" if artist else title,
+                "title": title or ident,
+                "artist": artist,
+                "album": str(m.get("xesam:album") or ""),
+                "art": art_path(str(m.get("mpris:artUrl") or "")),
+                "length": max(1, round(length, 1)),
+                "lenstr": fmt(length) if length else "",
+                "player": short,
+                "name": (desk or ident).split(".")[-1].lower(),
+                "music": True,
+                "shuffle": bool(p.get("Shuffle", False)),
+                "loop": str(p.get("LoopStatus", "None")),
+                "canseek": bool(p.get("CanSeek", False)) and length > 0,
+            }
+            out["w"] = PILL_W
+            cur = {"player": short, "identity": ident, "desktop": desk, "title": title}
+        s = json.dumps(out, ensure_ascii=False)
+        if s != last[0]:
+            last[0] = s
+            print(s, flush=True)
+            try:
+                with open(STATE + ".tmp", "w") as f:
+                    json.dump(cur, f, ensure_ascii=False)
+                os.replace(STATE + ".tmp", STATE)
+            except OSError:
+                pass
+        return True
+
+    def on_props(conn, sender, path, iface, signal, params):
+        changed_iface, changed, _ = params.unpack()
+        name = owners.get(sender)
+        if not name:
+            return
+        update(name, changed)
+        # some players (Spotify) omit fields from PropertiesChanged; re-read the lot
+        if changed_iface == "org.mpris.MediaPlayer2.Player" and "Metadata" in changed:
+            update(name, {k: v for k, v in get_all(name, "org.mpris.MediaPlayer2.Player").items()
+                          if k not in ("PlaybackStatus",)})
+        emit()
+
+    def on_owner(conn, sender, path, iface, signal, params):
+        name, old, new = params.unpack()
+        if not name.startswith(PREFIX):
+            return
+        if old:
+            owners.pop(old, None)
+            players.pop(name, None)
+        if new:
+            add(name)
+        emit()
+
+    bus.signal_subscribe(None, "org.freedesktop.DBus.Properties", "PropertiesChanged", PATH, None, 0, on_props)
+    bus.signal_subscribe("org.freedesktop.DBus", "org.freedesktop.DBus", "NameOwnerChanged",
+                         "/org/freedesktop/DBus", None, 0, on_owner)
+    names = bus.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+                          "ListNames", None, None, 0, 1000, None).unpack()[0]
+    for n in names:
+        if n.startswith(PREFIX):
+            add(n)
+    emit()
+    # Refresh the selected player in case a player misses a property notification.
+    GLib.timeout_add_seconds(3, emit)
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if not a:
+        listen()
+    elif a[0] == "pos":
+        cmd_pos()
+    elif a[0] == "vol" and len(a) > 1:
+        cmd_vol(a[1])
+    elif a[0] == "seek" and len(a) > 1:
+        cmd_seek(a[1])
+    elif a[0] == "focus":
+        cmd_focus()

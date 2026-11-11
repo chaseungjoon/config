@@ -1,0 +1,24 @@
+configuration {
+    modi:               "drun,run,window,ssh";
+    font:               "Inter Medium 12";
+    show-icons:         true;
+    icon-theme:         "Papirus-Dark";
+    terminal:           "ghostty";
+    drun-display-format: "{name}";
+    display-drun:       "󰀻";
+    display-run:        "󰆍";
+    display-window:     "󰖯";
+    display-ssh:        "󰣀";
+    matching:           "fuzzy";
+    sort:               true;
+    sorting-method:     "fzf";
+    case-sensitive:     false;
+    disable-history:    false;
+    scroll-method:      1;
+    window-format:      "{w}   {c}   {t}";
+    kb-row-up:          "Up,Control+k";
+    kb-row-down:        "Down,Control+j";
+    kb-accept-entry:    "Return,KP_Enter";
+    kb-remove-to-eol:   "";
+}
+@theme "~/.config/i3/rofi/horizon.rasi"

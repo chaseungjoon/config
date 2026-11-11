@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# toggle / report dunst do-not-disturb, keeping the eww variable in sync
+[[ $1 == toggle ]] && dunstctl set-paused toggle
+p=$(dunstctl is-paused 2>/dev/null); [[ $p == true ]] || p=false
+[[ $1 == toggle ]] && exec ~/.config/i3/bin/eww update dnd="$p"
+echo "$p"

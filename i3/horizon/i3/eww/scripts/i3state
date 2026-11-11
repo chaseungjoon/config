@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# eww listener: `i3state ws`  -> {"<output>": [{num, name, state}, ...], ...}
+#               `i3state win` -> {"title": ..., "class": ..., "app": ...} of the focused window
+#               (app = lowercase class minus any reverse-DNS prefix: Google-chrome -> google-chrome,
+#                com.mitchellh.ghostty -> ghostty)
+# state is one of focused | visible | urgent | occupied | empty (1-5 always exist on the primary output)
+import json, os, sys
+sys.path.insert(0, os.path.expanduser("~/.local/opt/i3-extras/root/usr/lib/python3/dist-packages"))
+import i3ipc
+
+PERSISTENT = range(1, 6)
+MODE = sys.argv[1] if len(sys.argv) > 1 else "ws"
+last = None
+
+
+def out(obj):
+    global last
+    s = json.dumps(obj, ensure_ascii=False)
+    if s != last:
+        last = s
+        print(s, flush=True)
+
+
+def workspaces(i3, _e=None):
+    tree = i3.get_tree()
+    occupied = {w.num for w in tree.workspaces() if w.leaves() or w.floating_nodes}
+    outs = [o for o in i3.get_outputs() if o.active]
+    home = next((o.name for o in outs if o.primary), outs[0].name if outs else "")
+    by_out = {o.name: {} for o in outs}
+    for w in i3.get_workspaces():
+        if w.urgent:
+            st = "urgent"
+        elif w.focused:
+            st = "focused"
+        elif w.visible:
+            st = "visible"
+        else:
+            st = "occupied" if w.num in occupied else "empty"
+        by_out.setdefault(w.output, {})[w.num] = {"num": w.num, "name": w.name, "state": st}
+    if home:
+        for n in PERSISTENT:
+            if not any(n in d for d in by_out.values()):
+                by_out[home][n] = {"num": n, "name": str(n), "state": "empty"}
+    out({o: [d[k] for k in sorted(d, key=lambda n: (n < 0, n))] for o, d in by_out.items()})
+
+
+def window(i3, _e=None):
+    f = i3.get_tree().find_focused()
+    if f is None or f.type != "con" or not f.window:
+        out({"title": "", "class": "", "app": ""})
+    else:
+        cls = f.window_class or f.window_instance or ""
+        out({"title": f.name or "", "class": cls, "app": cls.rsplit(".", 1)[-1].lower()})
+
+
+i3 = i3ipc.Connection()
+if MODE == "ws":
+    for ev in (i3ipc.Event.WORKSPACE, i3ipc.Event.OUTPUT, i3ipc.Event.WINDOW_NEW,
+               i3ipc.Event.WINDOW_CLOSE, i3ipc.Event.WINDOW_MOVE, i3ipc.Event.WINDOW_URGENT):
+        i3.on(ev, workspaces)
+    workspaces(i3)
+else:
+    for ev in (i3ipc.Event.WINDOW_FOCUS, i3ipc.Event.WINDOW_TITLE, i3ipc.Event.WINDOW_CLOSE,
+               i3ipc.Event.WINDOW_NEW, i3ipc.Event.WORKSPACE_FOCUS):
+        i3.on(ev, window)
+    window(i3)
+i3.main()

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# every connected output: keep its preferred resolution, pick the highest refresh rate for it
+# (X picks 59.95 Hz by default; this panel does 74.97)
+. ~/.config/i3/scripts/_env
+xrandr --query | awk '
+    / connected/ { out=$1; prim=($3=="primary"); next }
+    out && /^ +[0-9]+x[0-9]+/ {
+        if (!(out in mode) && $0 ~ /\+/) mode[out]=$1          # preferred mode (marked +)
+        if (mode[out]==$1) for (i=2;i<=NF;i++) { r=$i; gsub(/[*+]/,"",r); if (r+0>best[out]+0) best[out]=r }
+    }
+    /disconnected/ { out="" }
+    END { for (o in mode) printf "%s %s %s\n", o, mode[o], best[o] }' |
+while read -r out mode rate; do
+    xrandr --output "$out" --mode "$mode" --rate "$rate"
+done

@@ -1,0 +1,9 @@
+#!/bin/sh
+# restore the wallpaper last chosen with SUPER+SHIFT+W, else the event-horizon default
+. "$HOME/.config/i3/scripts/_env"
+state=$HOME/.config/i3/.wallpaper
+img=$(cat "$state" 2>/dev/null)
+[ -f "$img" ] || img=$HOME/Pictures/wallpapers/blackhole.png
+"$HOME/.config/i3/scripts/lock" --prepare >/dev/null 2>&1 &   # pre-build the lock background
+[ -f "$img" ] && exec feh --no-fehbg --bg-fill "$img"
+xsetroot -solid '#060a14'

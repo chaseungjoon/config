@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# volume / brightness keys -> change value, refresh bar block, show dunst progress bar
+. ~/.config/i3/scripts/_env
+sink=@DEFAULT_AUDIO_SINK@ src=@DEFAULT_AUDIO_SOURCE@
+# notifications off (dunst paused): skip the popup, otherwise they pile up and all flash on unpause
+dunstify() { [[ $(dunstctl is-paused 2>/dev/null) == true ]] || command dunstify "$@"; }
+vol_notify() {
+    local raw pct muted icon=audio-volume-high
+    raw=$(wpctl get-volume $sink)                     # "Volume: 0.45 [MUTED]"
+    pct=$(awk '{printf "%d", $2*100}' <<<"$raw")
+    (( pct < 60 )) && icon=audio-volume-medium; (( pct < 25 )) && icon=audio-volume-low
+    [[ $raw == *MUTED* ]] && { muted="  ·  muted"; icon=audio-volume-muted; }
+    dunstify -a osd -u low -i "$icon" -r 9901 -h int:value:"$pct" -h string:x-dunst-stack-tag:osd "Volume  ${pct}%${muted}"
+}
+case "$1" in
+    vol-up)    wpctl set-mute $sink 0; wpctl set-volume -l 1.5 $sink 5%+; vol_notify ;;
+    vol-down)  wpctl set-volume $sink 5%-; vol_notify ;;
+    vol-mute)  wpctl set-mute $sink toggle; vol_notify ;;
+    mic-mute)
+        wpctl set-mute $src toggle
+        if wpctl get-volume $src | grep -q MUTED; then state=off icon=microphone-sensitivity-muted
+        else state=on icon=audio-input-microphone; fi
+        dunstify -a osd -u low -i "$icon" -r 9902 "Microphone  $state" ;;
+    bright-up|bright-down)
+        if [[ -z $(ls /sys/class/backlight 2>/dev/null) ]]; then
+            dunstify -a osd -u low -i display-brightness -r 9903 "Brightness" "external monitor — use its own buttons"; exit 0
+        fi
+        [[ $1 == bright-up ]] && brightnessctl -q set 10%+ || brightnessctl -q -n2 set 10%-
+        pct=$(brightnessctl -m | awk -F, '{gsub("%","",$4); print $4}')
+        dunstify -a osd -u low -i display-brightness -r 9903 -h int:value:"$pct" -h string:x-dunst-stack-tag:osd "Brightness  ${pct}%" ;;
+esac

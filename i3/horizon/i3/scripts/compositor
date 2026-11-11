@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# (re)start picom v13, safe from exec_always; a small watchdog respawns it if it crashes
+# (picom silently dying is what left the old setup with no blur and no fades)
+if [[ $1 != --watch ]]; then
+    pkill -f 'scripts/compositor --watch'
+    pkill -x picom; while pgrep -x picom >/dev/null; do sleep 0.05; done
+    exec setsid -f "$0" --watch >/dev/null 2>&1
+fi
+log=${XDG_RUNTIME_DIR:-/tmp}/picom.log
+for _ in 1 2 3 4 5; do          # give up after 5 crashes instead of spinning
+    ~/.config/i3/bin/picom --config ~/.config/i3/picom.conf >>"$log" 2>&1
+    sleep 1
+done

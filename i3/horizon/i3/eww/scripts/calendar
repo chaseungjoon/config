@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+# calendar month for the clock drop-down: `calendar [month offset]` ->
+# {"off": 0, "title": "November 2026", "wd": [{"t": "S", "c": "sun"}, ...],
+#  "weeks": [[{"d": "1", "c": "sun today"}, ...], ...]}
+# c holds "dim" (spill-over days), "today", "sun" (Sundays, drawn red). Always six weeks so the
+# sheet keeps its height.
+import calendar, datetime, json, subprocess, sys
+
+off = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+today = datetime.date.today()
+y, m = divmod(today.year * 12 + today.month - 1 + off, 12)
+m += 1
+try:  # 1 = Sunday-first locale
+    first = int(subprocess.run(["locale", "first_weekday"], capture_output=True, text=True).stdout.strip() or 2)
+except ValueError:
+    first = 2
+cal = calendar.Calendar(firstweekday=6 if first == 1 else 0)
+days = list(cal.itermonthdates(y, m))
+while len(days) < 42:
+    days.append(days[-1] + datetime.timedelta(days=1))
+names = [("M", ""), ("T", ""), ("W", ""), ("T", ""), ("F", ""), ("S", ""), ("S", "sun")]
+names = names[6:] + names[:6] if first == 1 else names
+wd = [{"t": t, "c": c} for t, c in names]
+
+
+def cls(d):
+    c = ["today" if d == today else "" if d.month == m else "dim"]
+    if d.weekday() == 6:
+        c.append("sun")
+    return " ".join(x for x in c if x)
+
+
+weeks = [[{"d": str(d.day), "c": cls(d)} for d in days[i:i + 7]] for i in range(0, 42, 7)]
+print(json.dumps({"off": off, "title": datetime.date(y, m, 1).strftime("%B %Y"), "wd": wd, "weeks": weeks}))

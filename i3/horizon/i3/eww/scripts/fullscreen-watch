@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+# Hide the eww bar on any output whose visible workspace has a fullscreen window
+# (video players, browser video fullscreen, F11) and bring it back afterwards.
+# The bar is override-redirect, so i3's fullscreen can't cover it; we unmap it instead.
+import os, subprocess, sys
+sys.path.insert(0, os.path.expanduser("~/.local/opt/i3-extras/root/usr/lib/python3/dist-packages"))
+import i3ipc
+
+last = None
+
+
+def xdo(*args):
+    return subprocess.run(["xdotool", *args], capture_output=True, text=True).stdout
+
+
+def bars():
+    """{window id: (x, y)} for every eww bar, mapped or not."""
+    found = {}
+    for wid in xdo("search", "--name", "^Eww - bar$").split():
+        geo = dict(l.split("=", 1) for l in xdo("getwindowgeometry", "--shell", wid).split() if "=" in l)
+        if "X" in geo:
+            found[wid] = (int(geo["X"]), int(geo["Y"]))
+    return found
+
+
+def update(i3, _e=None):
+    global last
+    tree = i3.get_tree()
+    outputs = {o.name: o.rect for o in i3.get_outputs() if o.active}
+    shown = {w.name: w.output for w in i3.get_workspaces() if w.visible}
+    full_outputs, everywhere = set(), False
+    for ws in tree.workspaces():
+        modes = {c.fullscreen_mode for c in ws.descendants()}
+        if 2 in modes:  # global fullscreen covers every output
+            everywhere = True
+        if 1 in modes and ws.name in shown:
+            full_outputs.add(shown[ws.name])
+    rects = [outputs[o] for o in full_outputs if o in outputs]
+
+    plan = {}
+    for wid, (x, y) in bars().items():
+        plan[wid] = everywhere or any(r.x <= x < r.x + r.width and r.y <= y < r.y + r.height
+                                      for r in rects)
+    if plan == last:
+        return
+    last = plan
+    for wid, hide in plan.items():
+        xdo("windowunmap" if hide else "windowmap", wid)
+
+
+i3 = i3ipc.Connection()
+for ev in (i3ipc.Event.WINDOW, i3ipc.Event.WORKSPACE, i3ipc.Event.OUTPUT):
+    i3.on(ev, update)
+update(i3)
+i3.main()

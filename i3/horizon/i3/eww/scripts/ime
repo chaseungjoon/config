@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# bar badge: 한 when the hangul engine is active, EN otherwise
+[[ $(ibus engine 2>/dev/null) == hangul ]] && echo 한 || echo EN

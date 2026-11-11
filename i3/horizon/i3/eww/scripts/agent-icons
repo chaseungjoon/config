@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+# Build the state-coloured agent icons for the bar from the official marks in eww/icons/src:
+#   claude-logo.svg  — Anthropic's own asset, shipped in the Claude Code VS Code extension
+#                      (anthropic.claude-code-*/resources/claude-logo.svg)
+#   codex-logo.png   — OpenAI's Codex app mark, shipped in the ChatGPT/Codex desktop app
+#                      (/usr/lib/chatgpt/resources/app.asar: webview/assets/codex-app-ga-logo.*.png)
+#   copilot-logo.svg — GitHub's Copilot mark, shipped with the Copilot CLI
+#                      (~/.cache/copilot/pkg/linux-x64/<version>/assets/copilot.svg)
+# Output: eww/icons/{claude,copilot}-<state>.svg, eww/icons/codex-<state>.png
+#   (<state> = working, input, done, ready)
+# Re-run after changing the palette below.
+import os, re
+from PIL import Image
+
+D = os.path.expanduser("~/.config/i3/eww/icons")
+COLORS = {               # EVENT HORIZON: color3 / red / color2 / subtext
+    "working": "#f5c97a",
+    "input":   "#ec6a7d",    # palette red toned to the same saturation/lightness as the other two
+    "done":    "#5fe0b8",
+    "ready":   "#9db0d3",
+}
+SIZE = 18
+
+svg = open(f"{D}/src/claude-logo.svg").read()
+path = re.search(r'<path d="([^"]+)"', svg).group(1)
+for st, col in COLORS.items():
+    with open(f"{D}/claude-{st}.svg", "w") as f:
+        f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="{SIZE}" height="{SIZE}" viewBox="0 0 24 24">'
+                f'<path fill="{col}" fill-rule="nonzero" d="{path}"/></svg>\n')
+
+# Copilot: drop the white disc behind the mascot, keep its single path in the state colour,
+# cropped to the mascot's 618 px square so it fills the icon like the others
+svg = open(f"{D}/src/copilot-logo.svg").read()
+path = re.search(r'<path d="([^"]+)"', svg).group(1)
+for st, col in COLORS.items():
+    with open(f"{D}/copilot-{st}.svg", "w") as f:
+        f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="{SIZE}" height="{SIZE}" viewBox="103 103 618 618">'
+                f'<path fill="{col}" d="{path}"/></svg>\n')
+
+# Codex: keep the cloud silhouette, fill it with the state colour, punch the white ">_" out
+src = Image.open(f"{D}/src/codex-logo.png").convert("RGBA")
+# trim the transparent margin so the mark fills the icon like the Claude one does
+src = src.crop(src.getbbox())
+w, h = src.size
+mask = Image.new("L", (w, h))
+mp = mask.load()
+px = src.load()
+for y in range(h):
+    for x in range(w):
+        r, g, b, a = px[x, y]
+        white = max(0.0, min(1.0, (min(r, g, b) - 150) / 90))   # 0 = blue cloud, 1 = white glyph
+        mp[x, y] = int(a * (1 - white))
+side = max(w, h)
+sq = Image.new("L", (side, side))
+sq.paste(mask, ((side - w) // 2, (side - h) // 2))
+small = sq.resize((SIZE, SIZE), Image.LANCZOS)
+for st, col in COLORS.items():
+    rgb = tuple(int(col[i:i + 2], 16) for i in (1, 3, 5))
+    out = Image.new("RGBA", (SIZE, SIZE), rgb + (0,))
+    out.putalpha(small)
+    out.save(f"{D}/codex-{st}.png")
+print("icons written to", D)

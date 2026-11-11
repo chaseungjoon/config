@@ -1,0 +1,3 @@
+#!/bin/sh
+# self-built eww (X11-only build, ~/.local/opt/i3-extras/src/eww) pinned to the i3 bar config
+exec "$HOME/.local/opt/i3-extras/eww/bin/eww" -c "$HOME/.config/i3/eww" "$@"

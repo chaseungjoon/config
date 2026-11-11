@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Instant hover card for the bar's agent icons (GTK tooltips have a fixed 500 ms delay).
+# The `agentcard` eww window stays open but unmapped (eww/launch opens it off-screen and
+# unmaps it); hovering only swaps its content, moves it under the icon and maps it.
+#   agentcard show <id> <x inside the icon>     (eww onhover passes {0})
+#   agentcard hide <id>
+eww=~/.config/i3/bin/eww
+W=314                        # = defwindow agentcard :width
+ICON=32                      # agent pill width
+CARD_Y=50                    # just under the 46 px bar
+state=${XDG_RUNTIME_DIR:-/tmp}/eww-agentcard
+exec 9>"$state.lock"; flock 9
+
+wid=$(xdotool search --name '^Eww - agentcard$' | head -1)
+case $1 in
+show)
+    echo "$2" > "$state"
+    $eww update agent_hover="$2"
+    if [[ -z $wid ]]; then
+        $eww open agentcard --pos=-4000x0 >/dev/null 2>&1
+        wid=$(xdotool search --sync --name '^Eww - agentcard$' | head -1)
+    fi
+    eval "$(xdotool getmouselocation --shell)"   # sets X Y SCREEN WINDOW
+    rel=${3%.*}; left=$((X - ${rel:-16}))
+    x=$((left + ICON / 2 - W / 2)); ((x < 8)) && x=8
+    xdotool windowmove "$wid" "$x" "$CARD_Y" windowmap "$wid" windowraise "$wid"
+    ;;
+hide)
+    [[ $(cat "$state" 2>/dev/null) == "$2" || -z $2 ]] || exit 0
+    rm -f "$state"
+    [[ -n $wid ]] && xdotool windowunmap "$wid"
+    ;;
+esac

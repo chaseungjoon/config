@@ -1,0 +1,64 @@
+/* EVENT HORIZON :: frosted launcher — picom blurs what's behind and pops it in from 94% */
+* {
+    crust:   #060a14;
+    glass:   #070c18b8;   /* = terminal: #070c18 at 0.72 */
+    surface: #ffffff0b;
+    hover:   #ffffff12;
+    line:    #ffffff12;
+    muted:   #56688f;
+    subtext: #9db0d3;
+    text:    #e1e9f7;
+    accent:  #7d98ff;     /* accent text: lighter tint of the deep blue */
+    accentbg: #2b5cff52;  /* selection fill: deep blue #2b5cff at 32% */
+    red:     #ff6b81;
+
+    background-color: transparent;
+    text-color:       @text;
+    margin:  0;
+    padding: 0;
+    spacing: 0;
+}
+window {
+    location:         center;
+    width:            680px;
+    background-color: @glass;
+    border:           1px;
+    border-color:     @line;
+    border-radius:    20px;
+}
+mainbox {
+    padding:  16px;
+    spacing:  12px;
+    children: [ inputbar, message, listview ];
+}
+inputbar {
+    padding:          13px 16px;
+    spacing:          12px;
+    background-color: @surface;
+    border:           1px;
+    border-color:     @line;
+    border-radius:    13px;
+    children:         [ prompt, entry, num-filtered-rows ];
+}
+prompt            { text-color: @accent; font: "JetBrainsMono Nerd Font Propo 15"; vertical-align: 0.5; }
+entry             { placeholder: "Search"; placeholder-color: @muted; cursor: text; vertical-align: 0.5; }
+num-filtered-rows { text-color: @muted; vertical-align: 0.5; }
+message           { padding: 10px 14px; background-color: @surface; border-radius: 12px; }
+textbox           { text-color: @subtext; }
+listview {
+    lines:        12;
+    columns:      1;
+    fixed-height: true;
+    scrollbar:    false;
+    spacing:      3px;
+    expand:       true;
+}
+element                  { padding: 9px 12px; spacing: 14px; border-radius: 11px; }
+element normal.normal, element alternate.normal { text-color: @subtext; }
+element normal.urgent, element alternate.urgent { text-color: @red; }
+element normal.active, element alternate.active { text-color: @accent; }
+element selected.normal  { background-color: @accentbg; text-color: @text; }
+element selected.urgent  { background-color: @red; text-color: @crust; }
+element selected.active  { background-color: @accentbg; text-color: @accent; }
+element-text             { text-color: inherit; highlight: bold #7d98ff; vertical-align: 0.5; }
+element-icon             { size: 28px; vertical-align: 0.5; }

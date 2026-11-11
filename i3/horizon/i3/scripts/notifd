@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# start dunst with notifications OFF (paused) by default. Turn them on with the bell in
+# the bar or SUPER+SHIFT+D. While paused, dunst holds notifications and shows them on unpause.
+dunst -config ~/.config/i3/dunstrc &
+for _ in $(seq 50); do dunstctl is-paused >/dev/null 2>&1 && break; sleep 0.1; done
+dunstctl set-paused true
+~/.config/i3/bin/eww update dnd=true 2>/dev/null
+exit 0

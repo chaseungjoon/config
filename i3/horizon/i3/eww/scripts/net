@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# {"kind": "wired|wifi|none", "name": "...", "iface": "..."} for the default route
+dev=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
+if [[ -z $dev ]]; then echo '{"kind": "none", "name": "offline", "iface": ""}'; exit; fi
+if [[ -d /sys/class/net/$dev/wireless ]]; then
+    ssid=$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')
+    jq -cn --arg n "${ssid:-wifi}" --arg i "$dev" '{kind: "wifi", name: $n, iface: $i}'
+else
+    jq -cn --arg i "$dev" '{kind: "wired", name: "Ethernet", iface: $i}'
+fi

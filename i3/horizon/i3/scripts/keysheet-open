@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# SUPER+SHIFT+H: toggle the keyboard reference popup.
+# The sheet gets its own resident ghostty (class ghostty.keys): opening is an IPC call
+# (~70 ms) instead of a ~400 ms cold start. i3 maps it at its final size (see the
+# for_window rule) and the resize overlay is off, so no flash of a "134x27" box.
+# ask i3, not X: the resident instance keeps a hidden leader window with the same class
+if i3-msg -t get_tree | grep -q '"class":"ghostty\.keys"'; then
+    exec i3-msg -q '[class="^ghostty\.keys$"] kill'
+fi
+[[ $1 == --start ]] || { ghostty +new-window --class=ghostty.keys -e ~/.config/i3/scripts/keysheet >/dev/null 2>&1 && exit 0; }
+for p in $(pgrep -x ghostty); do      # restart only the key-sheet instance
+    tr '\0' ' ' < /proc/$p/cmdline | grep -q -- '--class=ghostty.keys ' && kill "$p"
+done
+setsid -f ghostty --class=ghostty.keys --gtk-single-instance=true --initial-window=false \
+    --quit-after-last-window-closed=false --resize-overlay=never \
+    --window-padding-x=18 --window-padding-y=18 --font-size=13 >/dev/null 2>&1
+[[ $1 == --start ]] && exit 0
+for _ in $(seq 30); do
+    sleep 0.1
+    ghostty +new-window --class=ghostty.keys -e ~/.config/i3/scripts/keysheet >/dev/null 2>&1 && exit 0
+done

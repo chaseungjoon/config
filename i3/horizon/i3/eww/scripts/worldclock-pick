@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+# City picker for the calendar sheet's world clock (click the tile). A rofi list styled as
+# the drop-down glass, docked to the right of the calendar sheet: live time, day/night,
+# city, country and offset for every city in eww/worldcities.tsv; type to filter.
+# The choice is saved to eww/worldclock.conf ("City = Area/Zone").
+import datetime, html, os, subprocess, zoneinfo
+
+D = os.path.expanduser("~/.config/i3/eww")
+CONF = f"{D}/worldclock.conf"
+RUN = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+FLAG = f"{RUN}/eww-picking"            # scripts/dropwatch ignores clicks while it exists
+ROFI = os.path.expanduser("~/.config/i3/bin/rofi")
+EWW = os.path.expanduser("~/.config/i3/bin/eww")
+
+MUTED, SUB, SUN, MOON, ACC = "#56688f", "#9db0d3", "#f5c97a", "#7d98ff", "#7d98ff"
+
+
+def current():
+    try:
+        for l in open(CONF):
+            l = l.split("#", 1)[0]
+            if "=" in l:
+                c, z = (x.strip() for x in l.split("=", 1))
+                if c and z:
+                    return c, z
+    except OSError:
+        pass
+    return "New York", "America/New_York"
+
+
+def sheet_rect():
+    out = subprocess.run(["xdotool", "search", "--name", "^Eww - drop-calendar$"],
+                         capture_output=True, text=True).stdout.split()
+    if not out:
+        return None
+    g = dict(l.split("=", 1) for l in subprocess.run(
+        ["xdotool", "getwindowgeometry", "--shell", out[0]], capture_output=True, text=True).stdout.split()
+        if "=" in l)
+    return int(g["X"]), int(g["Y"]), int(g["WIDTH"])
+
+
+def main():
+    cur_city, cur_zone = current()
+    now = datetime.datetime.now().astimezone()
+    loc_off = now.utcoffset().total_seconds()
+    cities = []
+    for l in open(f"{D}/worldcities.tsv"):
+        city, country, tz, kind = l.rstrip("\n").split("\t")
+        cities.append((city, country, tz, kind))
+    # current choice first
+    cities.sort(key=lambda c: not (c[0] == cur_city and c[2] == cur_zone))
+
+    rows = []
+    for city, country, tz, kind in cities:
+        t = now.astimezone(zoneinfo.ZoneInfo(tz))
+        d = int((t.utcoffset().total_seconds() - loc_off) // 60)
+        if d == 0:
+            diff = "same time"
+        else:
+            a = abs(d)
+            diff = ("+" if d > 0 else "−") + f"{a // 60}h" + (f" {a % 60}m" if a % 60 else "")
+        night = t.hour < 6 or t.hour >= 18
+        mark = (f'<span color="{ACC}" font_family="JetBrainsMono Nerd Font Propo">󰄬</span>  '
+                if city == cur_city and tz == cur_zone else "")
+        rows.append(
+            f'<span font_features="tnum" weight="bold">{t:%H:%M}</span>    '
+            f'<span color="{MOON if night else SUN}" font_family="JetBrainsMono Nerd Font Propo">'
+            f'{"󰖔" if night else "󰖙"}</span>    '
+            f'{mark}<span weight="bold">{html.escape(city)}</span>   '
+            f'<span color="{SUB}">{html.escape(country)}</span>   '
+            f'<span color="{MUTED}" size="small">{diff}</span>')
+
+    # dock it to the right of the calendar sheet, top edges aligned
+    r = sheet_rect()
+    pos = (f"window {{ location: north west; anchor: north west; x-offset: {r[0] + r[2] + 8}px; "
+           f"y-offset: {r[1]}px; }}") if r else ""
+    open(FLAG, "w").close()
+    try:
+        res = subprocess.run(
+            [ROFI, "-dmenu", "-i", "-markup-rows", "-no-custom", "-format", "i", "-selected-row", "0",
+             "-p", "󰖟", "-window-title", "World clock", "-theme", f"{D}/worldclock.rasi", "-theme-str", pos],
+            input="\n".join(rows), capture_output=True, text=True)
+    finally:
+        try:
+            os.unlink(FLAG)
+        except OSError:
+            pass
+    if res.returncode != 0 or not res.stdout.strip().isdigit():
+        return
+    city, country, tz, kind = cities[int(res.stdout.strip())]
+    with open(CONF, "w") as f:
+        f.write("# World clock for the calendar drop-down — pick it by clicking the world-clock tile.\n"
+                "# Format:  City = Area/Zone   (any tz database name, see `timedatectl list-timezones`)\n"
+                f"{city} = {tz}\n")
+    subprocess.run([EWW, "update", "clk=" + subprocess.run(
+        [f"{D}/scripts/clock"], capture_output=True, text=True).stdout.strip()])
+
+
+if __name__ == "__main__":
+    main()

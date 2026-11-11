@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# lock: the current screen crossfades into just the wallpaper (no windows, no bar), then a
+# frosted password box fades in. Patched i3lock, see
+# ~/.local/opt/i3-extras/src/i3lock-2.14.1/unlock_indicator.c. Pauses notifications/media.
+# `lock --prepare` only (re)builds the cached wallpaper background (run on wallpaper change).
+. ~/.config/i3/scripts/_env
+locker=$HOME/.local/opt/i3-extras/root/usr/bin/i3lock-box
+[[ -x $locker ]] || locker=i3lock
+wall=$(cat ~/.config/i3/.wallpaper 2>/dev/null)
+[[ -f $wall ]] || wall=$HOME/Pictures/wallpapers/blackhole.png
+
+# the wallpaper laid out like `feh --bg-fill` on every monitor; cached per wallpaper + layout
+size=$(xdpyinfo 2>/dev/null | awk '/dimensions:/ {print $2; exit}')
+mons=$(xrandr --listactivemonitors | awk 'NR>1 {split($3,a,/[x+\/]/); print a[1] "x" a[3] "+" a[5] "+" a[6]}')
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/i3lock
+img=$cache/$(printf '%s\n%s\n%s\n%s' "$wall" "$(stat -c %Y "$wall" 2>/dev/null)" "$size" "$mons" | md5sum | cut -c1-16).png
+if [[ ! -f $img && -n $size && -f $wall ]]; then
+    mkdir -p "$cache" && rm -f "$cache"/*.png
+    args=()
+    while read -r geo; do
+        [[ -n $geo ]] || continue
+        args+=( \( "$wall" -resize "${geo%%+*}^" -gravity center -extent "${geo%%+*}" \) -gravity northwest -geometry "+${geo#*+}" -composite )
+    done <<< "$mons"
+    convert -size "$size" xc:'#060a14' "${args[@]}" -depth 8 "$img.tmp.png" 2>/dev/null && mv "$img.tmp.png" "$img"
+fi
+[[ $1 == --prepare ]] && exit 0
+
+# the screen as it is right now: the starting frame of the crossfade
+shot=${XDG_RUNTIME_DIR:-/tmp}/i3lock-shot.png
+fade=()
+[[ -n $size ]] && ffmpeg -loglevel error -y -f x11grab -video_size "$size" -i "${DISPLAY:-:0}" -frames:v 1 \
+    -compression_level 1 "$shot" 2>/dev/null && fade=(--fade-from "$shot")
+
+was_paused=$(dunstctl is-paused 2>/dev/null)
+dunstctl set-paused true 2>/dev/null
+playerctl -a pause 2>/dev/null
+
+# -p default: keep the pointer visible so the box's arrow button can be clicked
+if [[ -f $img ]]; then
+    "$locker" -n -e -p default -c 060a14 -i "$img" "${fade[@]}"
+else
+    "$locker" -n -e -p default -c 060a14
+fi
+rm -f "$shot"
+[[ $was_paused == true ]] || dunstctl set-paused false 2>/dev/null

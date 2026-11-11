@@ -1,0 +1,552 @@
+// EVENT HORIZON (blue) — blue-tinted neutral ramp, one azure accent + its cyan
+// partner, red only for alerts. Same values as the i3 config, rofi, dunst, lock.
+$crust:   #060a14;
+$base:    #0a1020;
+$mantle:  #0f172b;
+$surface: #162038;
+$overlay: #22304f;
+$muted:   #56688f;
+$subtext: #9db0d3;
+$text:    #e1e9f7;
+$accent:  #2b5cff;   // deep blue: fills (active workspace, slider, selection)
+$accent-hi: #7d98ff; // same hue, lighter: accent-coloured text and icons on the dark glass
+$cyan:    #56d4f5;   // lighter partner, small highlights only
+$red:     #ff6b81;
+$glass:   rgba(#070c18, 0.72);   // = the terminal (ghostty background + opacity); every popup uses it
+
+$ease: cubic-bezier(0.16, 1, 0.3, 1);   // same expo-out curve picom uses
+
+// drop-downs + agent card: blue-tinted glass at 70 %, so the picom-blurred backdrop shows
+// through just enough to read as glass while everything on it stays crisp.
+// A flat colour on purpose: in these translucent windows GTK3 repaints a gradient wrongly
+// when a single label updates (it left a dark box behind the ticking clock).
+$sheet-alpha: 0.70;
+$sheet-bg: rgba(#17223f, $sheet-alpha);
+$sheet-line: rgba($accent-hi, 0.16);
+
+* {
+  all: unset;
+  font-family: "Inter", "JetBrainsMono Nerd Font Propo";
+  font-size: 13px;
+  font-weight: 600;
+}
+
+tooltip {
+  background-color: $glass;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px 10px;
+  label { color: $text; font-weight: 500; }
+}
+
+// ── the strip ─────────────────────────────────────────────────────────────
+.bar {
+  background-color: rgba($crust, 0.16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 0 10px;
+  color: $text;
+}
+
+// ── pills ─────────────────────────────────────────────────────────────────
+.pill {
+  margin: 7px 0;
+  padding: 0 13px;
+  border-radius: 11px;
+  background-color: rgba($base, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background-color 240ms $ease, border-color 240ms $ease;
+}
+button.pill:hover, .media:hover {
+  background-color: rgba($surface, 0.6);
+  border-color: rgba($accent, 0.22);
+}
+
+.icon-btn {
+  padding: 0 8px;
+  label {
+    font-family: "JetBrainsMono Nerd Font Propo";
+    font-size: 16px;
+    color: $subtext;
+    transition: color 200ms $ease;
+  }
+  &:hover label { color: $text; }
+}
+
+.launcher {
+  padding: 0 12px;
+  label { font-size: 18px; color: $accent-hi; }
+  &:hover label { color: lighten($accent-hi, 6%); }
+}
+
+// ── workspaces: numbers in a pill, the focused one stretches into a capsule
+.ws-pill { padding: 0 5px; }
+.ws {
+  min-width: 24px;
+  min-height: 22px;
+  margin: 5px 0;
+  border-radius: 8px;
+  color: rgba($muted, 0.75);
+  font-size: 12px;
+  font-weight: 700;
+  transition: min-width 320ms $ease, background-color 260ms $ease, color 260ms $ease;
+  &.occupied { color: $subtext; }
+  &.visible  { color: $accent-hi; background-color: rgba($accent, 0.18); }
+  &.focused  {
+    min-width: 42px;
+    color: #ffffff;
+    background-color: $accent;
+  }
+  &.urgent   { color: $crust; background-color: $red; }
+  &:hover:not(.focused):not(.urgent) {
+    color: $text;
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.title {
+  padding: 0 6px;
+  .title-class {
+    color: $accent-hi;
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
+
+// ── coding agents (Claude Code / Codex / Copilot): square pills, icon coloured by state ──
+$st-working: #f5c97a;   // Xresources color3
+$st-input:   #ec6a7d;   // $red toned down to match the yellow/green intensity
+$st-done:    #5fe0b8;   // Xresources color2
+$st-ready:   $subtext;
+
+.agent {
+  padding: 0;
+  min-width: 30px;              // + 1 px border each side = 32 = the pill's height: a square
+  transition: background-color 240ms $ease, border-color 240ms $ease;
+  // every state at the same intensity: only the icon colour + a faint matching border
+  &.working { border-color: rgba($st-working, 0.20); }
+  &.input   { border-color: rgba($st-input, 0.20); }
+  &.done    { border-color: rgba($st-done, 0.20); }
+  &:hover   { background-color: rgba($surface, 0.6); border-color: rgba($accent, 0.22); }
+}
+
+// hover card window: a blue-tinted glass (the bar's surface tones, not the near-black
+// terminal glass), 16 px corners (picom rounds the window with the same radius)
+.agentcard-win {
+  padding: 14px 12px 10px 12px;
+  border-radius: 16px;
+  border: 1px solid $sheet-line;
+  background-color: $sheet-bg;
+}
+.acard {
+  .ac-title { font-size: 14px; font-weight: 700; color: $text; }
+  // 󰉋 directory ……… 󰘚 model · effort (no box; the padding keeps it aligned with the chip below)
+  .ac-where {
+    margin-bottom: 4px;      // 16 px clear of the status chip below
+    padding: 7px 12px;
+    label { font-size: 12px; }
+    .ac-ico    { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 13px; color: $accent-hi; }
+    .ac-dir    { font-weight: 600; color: $text; }
+    .ac-model  { font-weight: 600; color: $subtext; }
+    .ac-sep    { color: $muted; }
+    .ac-effort { font-weight: 500; color: $subtext; }
+  }
+  .ac-state {
+    padding: 5px 10px;
+    border-radius: 8px;
+    .ac-dot   { font-size: 8px; }
+    .ac-st    { font-size: 12px; font-weight: 700; }
+    .ac-since { font-size: 11px; color: $subtext; font-feature-settings: "tnum"; }
+  }
+  &.working .ac-state { background-color: rgba($st-working, 0.12); .ac-dot, .ac-st { color: $st-working; } }
+  &.input   .ac-state { background-color: rgba($st-input, 0.12);   .ac-dot, .ac-st { color: $st-input; } }
+  &.done    .ac-state { background-color: rgba($st-done, 0.12);     .ac-dot, .ac-st { color: $st-done; } }
+  &.ready   .ac-state { background-color: rgba(255, 255, 255, 0.05); .ac-dot, .ac-st { color: $st-ready; } }
+
+  .ac-cap { font-size: 10px; font-weight: 700; color: $muted; }
+  .ac-val { font-size: 11px; font-weight: 600; color: $subtext; font-feature-settings: "tnum"; }
+  .ac-bar {
+    min-height: 6px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+  .ac-fill {
+    min-height: 6px;
+    border-radius: 6px;
+    &.ctx.lo  { background-color: $accent; }
+    &.ctx.mid { background-color: $st-working; }
+    &.ctx.hi  { background-color: $st-input; }
+    &.time    { background-image: linear-gradient(90deg, $accent, $cyan); }
+  }
+  .ac-tile {
+    padding: 7px 10px;
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    .ac-num { font-size: 15px; font-weight: 700; color: $text; font-feature-settings: "tnum"; }
+    .ac-arrow { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 13px; }
+    .ac-arrow.out { color: $accent-hi; }
+    .ac-arrow.in  { color: $cyan; }
+  }
+  .ac-hint { font-size: 10px; font-weight: 500; color: $muted; }
+}
+
+// ── centre ────────────────────────────────────────────────────────────────
+.clock {
+  padding: 0 16px;
+  .clock-time { font-weight: 700; font-size: 14px; color: $text; font-feature-settings: "tnum"; }
+  .clock-dot  { color: $cyan; font-size: 10px; }
+  .clock-date { color: $subtext; font-weight: 500; }
+}
+
+// now-playing: fixed 300 px (eww.yuck), = PILL_W in scripts/media
+.media {
+  padding: 0 10px 0 6px;
+  .media-btn {
+    min-width: 26px;
+    min-height: 26px;
+    margin: 3px 0;
+    border-radius: 8px;
+    transition: background-color 200ms $ease;
+    label {
+      font-family: "JetBrainsMono Nerd Font Propo";
+      font-size: 15px;
+      color: $subtext;
+      transition: color 200ms $ease;
+    }
+    &:hover { background-color: rgba($accent, 0.16); label { color: $text; } }
+    &.play label { color: $accent-hi; font-size: 16px; }
+  }
+  .media-hit {
+    margin: 3px 0;
+    border-radius: 8px;
+    // 10 px after the last button = the pill's 10 px right padding, so the centred title
+    // sits exactly between the ⏭ button and the right end
+    .media-text { margin-left: 10px; color: $subtext; font-weight: 500; transition: color 200ms $ease; }
+    &:hover .media-text { color: $text; }
+  }
+  &.Paused .media-btn.play label { color: $muted; }
+  // centred content: even padding so the group sits exactly in the middle
+}
+
+// ── right ─────────────────────────────────────────────────────────────────
+.net, .bt {
+  label {
+    font-family: "JetBrainsMono Nerd Font Propo";
+    font-size: 15px;
+    color: $subtext;
+    transition: color 200ms $ease;
+  }
+  &:hover label { color: $text; }
+}
+.net.none label, .bt.off label { color: $muted; }
+.bt.connected label { color: $accent-hi; }
+.vol-icon {
+  font-family: "JetBrainsMono Nerd Font Propo";
+  font-size: 15px;
+  color: $subtext;
+}
+.vol-text { min-width: 34px; font-feature-settings: "tnum"; }
+.vol.muted { .vol-icon, .vol-text { color: $muted; } }
+
+.vol-slider {
+  min-width: 90px;
+  margin: 0 4px;
+  trough {
+    min-height: 4px;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  highlight {
+    border-radius: 4px;
+    background-color: $accent;
+  }
+  slider {
+    min-width: 12px;
+    min-height: 12px;
+    margin: -4px 0;
+    border-radius: 12px;
+    background-color: $text;
+  }
+}
+
+.ime {
+  min-width: 22px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  label { font-size: 11px; font-weight: 800; color: $subtext; }
+  transition: background-color 200ms $ease;
+  &.ko { background-color: rgba($accent, 0.3); label { color: $accent-hi; } }
+  &:hover { background-color: rgba($accent, 0.4); }
+}
+.tray { padding: 0 12px; }
+.apps {
+  padding: 0 12px;
+  menu {
+    background-color: $glass;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 6px;
+    menuitem {
+      padding: 6px 12px;
+      border-radius: 6px;
+      color: $text;
+      &:hover { background-color: rgba($accent, 0.3); }
+      &:disabled label { color: $muted; }
+    }
+    separator { min-height: 1px; margin: 4px 6px; background-color: rgba(255, 255, 255, 0.08); }
+    arrow { min-width: 12px; }
+  }
+}
+
+.session { padding: 0 4px; }
+.dnd.on label { color: $cyan; }
+.power:hover label { color: $red; }
+
+// ── popups ────────────────────────────────────────────────────────────────
+.popup {
+  padding: 16px 18px;
+  background-color: $glass;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  color: $text;
+}
+.popup-title { color: $subtext; font-weight: 600; }
+.cal {
+  padding: 4px;
+  color: $text;
+  font-weight: 500;
+  &.header { color: $text; font-weight: 700; }
+  &.highlight { color: $muted; font-size: 11px; font-weight: 700; }   // weekday header
+  &:indeterminate { color: rgba($muted, 0.6); }                        // other months
+  &:selected {
+    color: #ffffff;
+    background-color: $accent;
+    border-radius: 8px;
+  }
+  &.button { color: $subtext; &:hover { color: $text; } }
+}
+
+// ── drop-down sheets ──────────────────────────────────────────────────────
+// A sheet lies exactly on its pill (same x / width / top edge, same 11 px radius — picom's
+// `Eww - drop` rule rounds the window with it and unrolls it), so its first row reads as
+// the pill and the rest is pulled down out of it. Inside, it is built from the same parts
+// as the bar and rofi: glass, hairline-bordered "inpills", 8 px buttons, the accent
+// capsule of the focused workspace, the bar's thin sliders.
+$hair: rgba(255, 255, 255, 0.07);       // = rofi @line / bar pill border
+$surf: rgba(255, 255, 255, 0.045);      // = rofi @surface
+
+.sheet {
+  background-color: $sheet-bg;
+  border: 1px solid $sheet-line;
+  border-radius: 11px;
+  color: $text;
+}
+.sheet-head {
+  min-height: 30px;          // + 1 px border + 1 px separator = the 32 px pill
+  border-radius: 10px 10px 0 0;
+  transition: background-color 200ms $ease;
+  &:hover { background-color: rgba($accent, 0.10); }
+  .sheet-arrow {
+    font-family: "JetBrainsMono Nerd Font Propo";
+    font-size: 16px;
+    color: $subtext;
+    transition: color 200ms $ease;
+  }
+  &:hover .sheet-arrow { color: $text; }
+}
+.sheet-sep { min-height: 1px; background-color: rgba(255, 255, 255, 0.06); }
+
+
+// music sheet ─────────────────────────────────────────────────────────────
+// one centred column on the 70 % blue glass; flat colours only (gradients repaint badly
+// in these translucent windows). Hierarchy: accent = seek + play, soft white = volume,
+// toggles: dim off / white-on-blue on.
+.music { padding: 20px 20px 18px 20px; }
+
+.art {
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba($base, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.38);
+  &.none { background-color: rgba($accent, 0.22); }
+  .art-ph {
+    font-family: "JetBrainsMono Nerd Font Propo";
+    font-size: 56px;
+    color: rgba($text, 0.5);
+  }
+}
+
+.m-info {
+  margin-top: 18px;
+  .m-title  { font-size: 15px; font-weight: 700; color: $text; }
+  .m-artist { margin-top: 3px; font-size: 13px; font-weight: 500; color: $subtext; }
+  .m-album  { margin-top: 2px; font-size: 11px; font-weight: 600; color: $muted; }
+}
+
+// sliders: thin like the bar's, the knob only grows when you reach for it
+.seek, .av-slider {
+  trough {
+    min-height: 4px;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.10);
+  }
+  highlight { border-radius: 4px; }
+  slider {
+    min-width: 10px;
+    min-height: 10px;
+    margin: -3px 0;
+    border-radius: 10px;
+    background-color: $text;
+    transition: min-width 160ms $ease, min-height 160ms $ease, margin 160ms $ease;
+  }
+  &:hover slider { min-width: 14px; min-height: 14px; margin: -5px 0; }
+}
+.seek highlight { background-color: $accent; }
+.seek.locked highlight { background-color: $muted; }
+.av-slider highlight { background-color: rgba($text, 0.62); }
+
+.m-seek { margin-top: 18px; }
+.times {
+  margin-top: 5px;
+  label { font-size: 11px; font-weight: 600; color: $muted; font-feature-settings: "tnum"; }
+}
+
+.m-transport { margin-top: 10px; }
+.t-btn {
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 11px;
+  transition: background-color 200ms $ease;
+  label {
+    font-family: "JetBrainsMono Nerd Font Propo";
+    font-size: 19px;
+    color: $subtext;
+    transition: color 200ms $ease;
+  }
+  &:hover { background-color: rgba(255, 255, 255, 0.07); label { color: $text; } }
+  &.skip label { font-size: 21px; color: $text; }
+  &.toggle {
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 10px;
+    label { font-size: 16px; color: $muted; }
+    &:hover label { color: $subtext; }
+  }
+  &.toggle.on {
+    background-color: rgba($accent, 0.34);
+    label { color: #ffffff; }
+    &:hover { background-color: rgba($accent, 0.46); }
+  }
+  // play / pause: the focused-workspace capsule, a touch of top light
+  &.play {
+    min-width: 58px;
+    min-height: 42px;
+    border-radius: 13px;
+    background-color: $accent;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.18), 0 6px 16px rgba($accent, 0.28);
+    label { font-size: 22px; color: #ffffff; }
+    &:hover { background-color: lighten($accent, 6%); }
+  }
+}
+
+.m-vol {
+  margin-top: 16px;
+  padding: 0 2px;
+  .av-icon { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 15px; color: $subtext; }
+  .av-text { min-width: 36px; font-size: 11px; font-weight: 600; color: $subtext; font-feature-settings: "tnum"; }
+  &.nosink { .av-icon, .av-text { color: $muted; } }
+}
+
+// footer: same height + hover as the header, so the sheet is framed top and bottom
+.m-foot {
+  min-height: 38px;
+  padding: 0 20px;
+  border-radius: 0 0 10px 10px;
+  transition: background-color 200ms $ease;
+  label { font-size: 12px; }
+  .m-dot  { font-size: 7px; color: $muted; &.Playing { color: $cyan; } }
+  .m-src  { font-weight: 600; color: $subtext; }
+  .m-open { font-weight: 600; color: $muted; transition: color 200ms $ease; }
+  .m-go   { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 13px; color: $muted; transition: color 200ms $ease; }
+  &:hover {
+    background-color: rgba($accent, 0.10);
+    .m-src { color: $text; }
+    .m-open, .m-go { color: $accent-hi; }
+  }
+}
+
+// calendar sheet ──────────────────────────────────────────────────────────
+// same language as the music sheet: one centred column on the 70 % blue glass, flat
+// colours, a footer mirroring the header. Sundays are red (a softened $red, like the
+// agent "needs you" red, so it reads as a hue, not an alarm).
+$sunday: #ec6a7d;
+
+.cal-body { padding: 16px 12px 10px 12px; }
+
+// now
+.c-now {
+  .c-hm   { font-size: 30px; font-weight: 700; color: $text; font-feature-settings: "tnum"; }
+  .c-s    { margin-bottom: 6px; font-size: 13px; font-weight: 700; color: $accent-hi; font-feature-settings: "tnum"; }
+  .c-date { margin-top: 1px; font-size: 11px; font-weight: 600; color: $subtext; }
+}
+
+// world clock tile
+.c-world {
+  margin-top: 14px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  background-color: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: background-color 200ms $ease, border-color 200ms $ease;
+  .c-wicon { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 16px; }
+  .c-city  { font-size: 12px; font-weight: 700; color: $text; }
+  .c-wmeta { font-size: 10px; font-weight: 600; color: $muted; }
+  .c-wtime { font-size: 17px; font-weight: 700; color: $text; font-feature-settings: "tnum"; }
+  &.day   .c-wicon { color: #f5c97a; }
+  &.night .c-wicon { color: $accent-hi; }
+  &:hover { background-color: rgba($accent, 0.14); border-color: rgba($accent-hi, 0.22); }
+}
+
+// month
+.calendar { margin-top: 14px; }
+.cal-nav { margin-bottom: 6px; }
+.cal-arrow {
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 8px;
+  label { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 14px; color: $subtext; }
+  &:hover { background-color: rgba(255, 255, 255, 0.08); label { color: $text; } }
+}
+.cal-title {
+  border-radius: 8px;
+  label { font-size: 12px; font-weight: 700; color: $text; }
+  &:hover { background-color: rgba($accent, 0.16); }
+}
+.cal-row label { min-height: 23px; font-size: 11px; font-feature-settings: "tnum"; }
+.cal-wd label { min-height: 18px; font-size: 9px; font-weight: 800; color: $muted; }
+.cal-w.sun { color: rgba($sunday, 0.85); }
+.cal-day {
+  color: $text;
+  font-weight: 500;
+  border-radius: 7px;
+  &.sun   { color: $sunday; }
+  &.dim   { color: rgba($muted, 0.55); }
+  &.dim.sun { color: rgba($sunday, 0.38); }
+  &.today { color: #ffffff; background-color: $accent; font-weight: 700; }
+}
+
+// footer: same build as the music sheet's
+.c-foot {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 0 0 10px 10px;
+  transition: background-color 200ms $ease;
+  label { font-size: 11px; }
+  .c-dot   { font-size: 7px; color: $cyan; }
+  .c-zone  { font-weight: 600; color: $subtext; }
+  .c-today { font-weight: 700; color: $muted; transition: color 200ms $ease; }
+  .c-today.away { color: $accent-hi; }
+  &:hover { background-color: rgba($accent, 0.10); .c-zone { color: $text; } .c-today { color: $accent-hi; } }
+}

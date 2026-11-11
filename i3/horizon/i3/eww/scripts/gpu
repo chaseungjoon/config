@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# {"util": 12, "temp": 41, "mem": 23}  (mem = % of VRAM used)
+IFS=', ' read -r u t mu mt < <(nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
+[[ -n $u ]] || { echo '{"util": 0, "temp": 0, "mem": 0}'; exit 0; }
+echo "{\"util\": $u, \"temp\": $t, \"mem\": $(( mu * 100 / mt ))}"

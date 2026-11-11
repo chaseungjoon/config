@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# power menu: four entries, no prompt bar, no confirmations
+. ~/.config/i3/scripts/_env
+theme='window {width: 300px;} mainbox {children: [listview];} listview {lines: 4;}'
+opts="󰌾  Lock\n󰍃  Log out\n󰜉  Reboot\n󰐥  Power off"
+choice=$(echo -e "$opts" | rofi -dmenu -i -no-custom -theme-str "$theme")
+case "$choice" in
+    *Lock)        sleep 0.15; ~/.config/i3/scripts/lock ;;   # let rofi fade out before the screenshot
+    *"Log out")   i3-msg exit ;;
+    *Reboot)      systemctl reboot ;;
+    *"Power off") systemctl poweroff ;;
+esac

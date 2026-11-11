@@ -1,0 +1,30 @@
+! 27-inch 2560x1440 at 96 dpi, matching the GNOME session at 100% scale
+Xft.dpi:       96
+Xft.antialias: true
+Xft.hinting:   true
+Xft.hintstyle: hintslight
+Xft.rgba:      rgb
+Xft.lcdfilter: lcddefault
+Xcursor.theme: Vimix-white-cursors
+Xcursor.size:  24
+
+! EVENT HORIZON (blue) for any X11 app that reads resources (xterm, etc.)
+*.foreground:  #e1e9f7
+*.background:  #060a14
+*.cursorColor: #2b5cff
+*.color0:  #162038
+*.color8:  #56688f
+*.color1:  #ff6b81
+*.color9:  #ff8d9e
+*.color2:  #5fe0b8
+*.color10: #8ff0d0
+*.color3:  #f5c97a
+*.color11: #ffdca0
+*.color4:  #3d6bff
+*.color12: #8cc2ff
+*.color5:  #8f9bff
+*.color13: #b3bcff
+*.color6:  #56d4f5
+*.color14: #8be3fa
+*.color7:  #c2cee6
+*.color15: #f2f6fd

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# SUPER+D: toggle English <-> 한국어 (ibus engines), update the bar badge, flash an OSD
+if [[ $(ibus engine 2>/dev/null) == hangul ]]; then
+    ibus engine xkb:us::eng && label=EN text="English"
+else
+    ibus engine hangul && label=한 text="한국어"
+fi
+~/.config/i3/bin/eww update ime="$label" 2>/dev/null
+[[ $(dunstctl is-paused 2>/dev/null) == true ]] || dunstify -a osd -u low -r 9904 -h string:x-dunst-stack-tag:osd -t 900 "󰌌  $text" 2>/dev/null
+exit 0

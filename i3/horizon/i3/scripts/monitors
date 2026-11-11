@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# display menu: arrange the primary output with whatever else is plugged in
+. ~/.config/i3/scripts/_env
+mapfile -t outs < <(xrandr --query | awk '/ connected/ {print $1}')
+pri=$(xrandr --query | awk '/ connected primary/ {print $1; exit}'); pri=${pri:-${outs[0]}}
+ext=""; for o in "${outs[@]}"; do [[ $o != "$pri" ]] && { ext=$o; break; }; done
+theme='window {width: 420px;} listview {lines: 7;}'
+if [[ -z $ext ]]; then
+    choice=$(echo -e "󰍹  Reset $pri (max refresh)\n󰒓  Arandr…" | rofi -dmenu -i -p "󰍹" -no-custom -mesg "Only $pri is connected" -theme-str "$theme")
+    case "$choice" in
+        *Reset*)  ~/.config/i3/scripts/display-init ;;
+        *Arandr*) arandr & exit ;;
+        *) exit ;;
+    esac
+else
+    choice=$(echo -e "󰍹  $pri only\n󰍺  Extend right\n󰍺  Extend left\n󰍺  Extend above\n󰶐  Mirror\n󰍹  $ext only\n󰒓  Arandr…" |
+        rofi -dmenu -i -p "󰍹" -no-custom -mesg "$pri  +  $ext" -theme-str "$theme")
+    case "$choice" in
+        *"$pri only")     xrandr --output "$pri" --auto --primary --output "$ext" --off ;;
+        *"Extend right")  xrandr --output "$pri" --auto --primary --output "$ext" --auto --right-of "$pri" ;;
+        *"Extend left")   xrandr --output "$pri" --auto --primary --output "$ext" --auto --left-of "$pri" ;;
+        *"Extend above")  xrandr --output "$pri" --auto --primary --output "$ext" --auto --above "$pri" ;;
+        *Mirror)          xrandr --output "$pri" --auto --primary --output "$ext" --auto --same-as "$pri" ;;
+        *"$ext only")     xrandr --output "$ext" --auto --primary --output "$pri" --off ;;
+        *Arandr*)         arandr & exit ;;
+        *) exit ;;
+    esac
+    ~/.config/i3/scripts/display-init
+fi
+sleep 1; ~/.config/i3/scripts/wallpaper-restore

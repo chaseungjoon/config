@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# SUPER+C: calculator (rofi-calc replacement). type an expression, Enter evaluates;
+# pick a result line to copy it to the clipboard. python math names work: sqrt, pi, log, sin…
+. ~/.config/i3/scripts/_env
+hist=()
+mesg="sqrt(2) · 2**10 · 0x1f · 15% of 80 → 0.15*80"
+while :; do
+    sel=$(printf '%s\n' "${hist[@]}" | rofi -dmenu -p "󰃬" -mesg "$mesg" \
+        -theme-str 'window {width: 620px;} listview {lines: 6;} entry {placeholder: "Calculate…";}')
+    [[ -n $sel ]] || exit 0
+    if [[ $sel == *" = "* ]]; then                       # picked a previous result -> copy it
+        printf '%s' "${sel##* = }" | xclip -selection clipboard
+        notify-send -a osd -u low -i accessories-calculator "Copied" "${sel##* = }"; exit 0
+    fi
+    res=$(python3 -I -c '
+import math, sys
+ns = {k: getattr(math, k) for k in dir(math) if not k.startswith("_")}
+ns.update(abs=abs, round=round, min=min, max=max, int=int, float=float, hex=hex, bin=bin, oct=oct)
+expr = sys.argv[1].replace("^", "**").replace("×", "*").replace("÷", "/")
+r = eval(expr, {"__builtins__": {}}, ns)
+if isinstance(r, float) and r.is_integer() and abs(r) < 1e15: r = int(r)
+print(r)' "$sel" 2>/dev/null) || res="error"
+    hist=("$sel = $res" "${hist[@]}")
+    mesg="<b>$sel</b>  =  <span color='#7d98ff'><b>$res</b></span>      (pick a line to copy)"
+done
