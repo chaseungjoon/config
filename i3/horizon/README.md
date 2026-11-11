@@ -10,4 +10,12 @@ Each running Claude Code, Codex, or Copilot CLI terminal gets an icon: yellow wo
 
 `Super+R` opens apps, `Super+F1` searches keys, `Super+Shift+H` shows the keysheet, `Super+D` switches input language, `Super+Shift+W` picks a wallpaper, and `Super+Shift+D` toggles notifications. Vim keys focus, move, and resize windows. Other bindings cover screenshots, media, brightness, night light, monitor layout, clipboard, scratch terminal, and session power. See [`i3/config`](i3/config) for the full key list.
 
-Install to your chosen home root: `curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- i3-horizon "$HOME"`. This copies only this i3 tree and backs up replaced files. It expects i3, Ghostty, Eww, Picom v13, Rofi, Dunst, Feh, XSS-lock, xdotool, playerctl, WirePlumber, Fcitx5, and the commands used by the scripts. The `bin/` shims prefer system tools but some point to local builds under `~/.local/opt/i3-extras`; install those builds or change the shims. Set a wallpaper with `Super+Shift+W`; the original wallpaper is outside this repo.
+## Install
+
+The final path is the home root. Requires i3, Ghostty, Eww, Picom v13, Rofi, Dunst, Feh, XSS-lock, xdotool, playerctl, WirePlumber, Fcitx5, and commands used by the scripts. Some `bin/` shims point to local builds under `~/.local/opt/i3-extras`; install those builds or change the shims.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- i3-horizon "$HOME"
+```
+
+Set a wallpaper with `Super+Shift+W`; the original wallpaper is outside this repo.

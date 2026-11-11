@@ -4,4 +4,12 @@ Amber on charcoal (`#ffb000`, `#1c1b19`), designed for low motion and hardware c
 
 ![Amber screenshot pending](../screenshots/amber-placeholder.svg)
 
-Install to your chosen home root: `curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- i3-amber "$HOME"`. This also installs the [Arch desktop theme](../../arch/). Install i3, i3blocks, Kitty, Rofi, Dunst, Feh, Azote, and the commands used by the scripts. Adjust display, battery, and touchpad names for your system. See [SCREENSHOT.md](../SCREENSHOT.md) to replace the placeholder.
+## Install
+
+The final path is the home root. This also installs the [Arch desktop theme](../../arch/). Install i3, i3blocks, Kitty, Rofi, Dunst, Feh, Azote, and the commands used by the scripts. Adjust display, battery, and touchpad names for your system.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- i3-amber "$HOME"
+```
+
+See [SCREENSHOT.md](../SCREENSHOT.md) to replace the placeholder.
