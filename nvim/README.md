@@ -1,32 +1,35 @@
 # Neovim
 
-Minimal, transparent Neovim with Tokyonight and lazy.nvim.
+Minimal, transparent Neovim on lazy.nvim with the Tokyonight theme.
 
-- Code: Coc LSP, Copilot, Treesitter, VimTeX.
-- Navigation: Telescope, Neo-tree, surround.
-- UI: alpha, lualine, render-markdown, transparent, autopairs.
-- Support: plenary.
+![Neovim](https://github.com/user-attachments/assets/fa80f757-4037-4a2e-9243-d6bac9484bc4)
+
+## Plugins
+
+| | |
+| --- | --- |
+| **Code** | Coc (LSP), Copilot, Treesitter, VimTeX, autopairs, surround |
+| **Navigation** | Telescope, Neo-tree |
+| **UI** | alpha, lualine, render-markdown, transparent |
 
 ## Install
-
-Requires Neovim ≥0.10, tree-sitter-cli, ripgrep, fd, lua-language-server,
-and a Nerd Font. Change the last path to choose the config directory.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- nvim "$HOME/.config/nvim"
 ```
 
-Open Neovim to install plugins. Then set up Coc and Copilot:
+**Requires:** Neovim 0.10+, tree-sitter-cli, ripgrep, fd, lua-language-server,
+and a Nerd Font.
+
+Open Neovim to install the plugins, then set up Coc and Copilot:
 
 ```vim
 :CocInstall coc-python coc-clangd coc-json
 :Copilot setup
 ```
 
-Configured language servers: pyright, clangd, coc-lua, coc-rust-analyzer.
-The [Coc manifest](coc-extensions/package.json) records the listed extensions.
+Language servers are configured for pyright, clangd, coc-lua, and
+coc-rust-analyzer. The full extension list is in
+[`coc-extensions/package.json`](coc-extensions/package.json).
 
-![Neovim screenshot 1](https://github.com/user-attachments/assets/fa80f757-4037-4a2e-9243-d6bac9484bc4)
-![Neovim screenshot 2](https://github.com/user-attachments/assets/7c2d9266-0a63-4bee-94a2-79dcdaadd6dc)
-
-Original repository: [nvim.config](https://github.com/chaseungjoon/nvim.config).
+![Neovim editing](https://github.com/user-attachments/assets/7c2d9266-0a63-4bee-94a2-79dcdaadd6dc)
