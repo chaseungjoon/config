@@ -2,10 +2,6 @@
 
 Two independent i3 setups. Pick one.
 
-![Amber desktop](screenshots/amber-desktop.png)
-
-![Horizon bar](screenshots/horizon-bar.png)
-
 | | [Amber](amber/) | [Horizon](horizon/) |
 | --- | --- | --- |
 | **Focus** | Low motion, light on resources | Polish and AI agent workflows |
@@ -15,3 +11,11 @@ Two independent i3 setups. Pick one.
 | **Font** | Terminess Nerd Font | Inter, JetBrainsMono Nerd Font |
 | **Palette** | Amber `#ffb000` on charcoal `#1c1b19` | Blue `#2b5cff` on navy `#060a14` |
 | **Includes** | The [Arch theme](../arch/) | Its own Rofi, Dunst, and Xresources |
+
+**[Amber](amber/)**: desktop with Kitty and Rofi
+
+![Amber desktop](screenshots/amber-desktop.png)
+
+**[Horizon](horizon/)**: bar
+
+![Horizon bar](screenshots/horizon-bar.png)
