@@ -27,6 +27,8 @@ curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh
 Each config's page has a ready-to-copy command. Destinations must be absolute.
 Files that would be overwritten are first moved to `~/.local/state/config/`.
 Run `./install.sh` from a clone to install your local copy.
+Run `./collect.sh` to copy this machine's live Arch theme files back into
+`arch/home`.
 
 ## License
 
