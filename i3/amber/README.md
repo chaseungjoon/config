@@ -3,6 +3,8 @@
 Low-motion i3 for constrained hardware: amber on charcoal, square edges,
 Terminess Nerd Font, and a 20 px i3blocks bar.
 
+![Amber bar](../screenshots/amber-bar.png)
+
 ## Features
 
 - **Bar:** CPU, memory, disk, temperature, volume, brightness, battery, date,

@@ -2,6 +2,8 @@
 
 Two independent i3 setups. Pick one.
 
+![Amber desktop](screenshots/amber-desktop.png)
+
 ![Horizon bar](screenshots/horizon-bar.png)
 
 | | [Amber](amber/) | [Horizon](horizon/) |
