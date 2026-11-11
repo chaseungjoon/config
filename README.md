@@ -2,8 +2,6 @@
 
 My dotfiles: Neovim, tmux, an Arch desktop theme, and two i3 setups.
 
-![Horizon bar](i3/screenshots/horizon-bar.png)
-
 | Config | Description |
 | --- | --- |
 | [**nvim**](nvim/) | Transparent Neovim with Tokyonight, Coc, Copilot, and Telescope |
