@@ -28,12 +28,6 @@ Each config's page has a ready-to-copy command. Destinations must be absolute.
 Files that would be overwritten are first moved to `~/.local/state/config/`.
 Run `./install.sh` from a clone to install your local copy.
 
-These configs were previously kept in
-[nvim.config](https://github.com/chaseungjoon/nvim.config),
-[tmux.config](https://github.com/chaseungjoon/tmux.config), and
-[arch.config](https://github.com/chaseungjoon/arch.config), which still holds
-the original machine migration snapshot.
-
 ## License
 
 [MIT](LICENSE)

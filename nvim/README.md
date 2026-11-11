@@ -1,6 +1,7 @@
 # Neovim
 
-Minimal, transparent Neovim on lazy.nvim with the Tokyonight theme.
+Minimal, transparent Neovim on lazy.nvim with the Tokyonight theme. One config
+for macOS and Linux.
 
 ![Neovim](https://github.com/user-attachments/assets/fa80f757-4037-4a2e-9243-d6bac9484bc4)
 
@@ -18,8 +19,15 @@ Minimal, transparent Neovim on lazy.nvim with the Tokyonight theme.
 curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- nvim "$HOME/.config/nvim"
 ```
 
-**Requires:** Neovim 0.10+, tree-sitter-cli, ripgrep, fd, lua-language-server,
-and a Nerd Font.
+**Requires:** Neovim 0.12+, tree-sitter-cli, ripgrep, fd, lua-language-server,
+a C compiler, and a Nerd Font.
+
+| | macOS | Linux |
+| --- | --- | --- |
+| **LaTeX** | MacTeX | TinyTeX in `~/.TinyTeX` |
+| **PDF viewer** | Skim | Zathura, else `xdg-open` |
+
+The config detects the OS at startup and picks the paths and viewer itself.
 
 Open Neovim to install the plugins, then set up Coc and Copilot:
 

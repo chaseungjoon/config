@@ -16,6 +16,6 @@ Two independent i3 setups. Pick one.
 
 ![Amber desktop](screenshots/amber-desktop.png)
 
-**[Horizon](horizon/)**: bar
+**[Horizon](horizon/)**: desktop with Ghostty and Rofi
 
-![Horizon bar](screenshots/horizon-bar.png)
+![Horizon desktop](screenshots/horizon-desktop.png)
