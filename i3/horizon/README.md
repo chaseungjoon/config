@@ -1,21 +1,46 @@
 # Horizon
 
-Blue on near-black (`#2b5cff`, `#060a14`) with a 46 px glass Eww bar, rounded pills, Picom blur and animations, Inter and JetBrainsMono Nerd Font. Rofi, Dunst, the lock screen, and Xresources share the palette.
+Blue glass i3 for AI native workflows. A 46 px Eww bar, rounded pills,
+Picom blur and animations, Inter and JetBrainsMono Nerd Font.
+Rofi, Dunst, the lock screen, and Xresources share the palette
+(`#2b5cff` on `#060a14`).
 
 ![Live top bar, including an agent status icon](../screenshots/horizon-bar.png)
 
-The bar shows a launcher, per-monitor workspaces, focused app, clock, media, system tray, input language, network, Bluetooth, volume, notifications, and session power. The clock opens a calendar with a selectable world clock. The media pill opens album art, playback, seek, shuffle, repeat, and volume controls. The volume pill expands a slider on hover; the bar hides for fullscreen windows.
+## Bar
 
-Each running Claude Code, Codex, or Copilot CLI terminal gets an icon: yellow working, red awaiting input, green done, grey ready. Hover for the task, project, model, elapsed state, context usage, and token counts; click to focus the terminal. The tracker reads local session data at runtime. Codex state is improved by the optional `eww/scripts/agent-hook` hook; no session data is included here.
+- **Left:** launcher, per-monitor workspaces, focused app, agent icons.
+- **Center:** clock and media. Click for a calendar and world clock, or
+  album art, playback, seek, shuffle, repeat, and volume.
+- **Right:** system tray, input language, network, Bluetooth, volume,
+  notifications, and power. Volume expands on hover.
+- The bar hides for fullscreen windows.
 
-`Super+R` opens apps, `Super+F1` searches keys, `Super+Shift+H` shows the keysheet, `Super+D` switches input language, `Super+Shift+W` picks a wallpaper, and `Super+Shift+D` toggles notifications. Vim keys focus, move, and resize windows. Other bindings cover screenshots, media, brightness, night light, monitor layout, clipboard, scratch terminal, and session power. See [`i3/config`](i3/config) for the full key list.
+## Agent tracking
+
+Claude Code, Codex, and Copilot CLI sessions appear as icons: yellow working,
+red awaiting input, green done, grey ready. Hover for task, project, model,
+elapsed time, context use, and tokens; click to focus the terminal.
+The tracker reads local sessions at runtime. The optional
+[`agent-hook`](i3/eww/scripts/agent-hook) improves Codex state detection.
+
+## Keys
+
+`Super+R` apps · `Super+F1` key search · `Super+Shift+H` keysheet ·
+`Super+D` input language · `Super+Shift+W` wallpaper ·
+`Super+Shift+D` notifications. Vim keys focus, move, and resize windows.
+See [`i3/config`](i3/config) for screenshots, media, brightness,
+night light, monitors, clipboard, scratch terminal, and power.
 
 ## Install
 
-The final path is the home root. Requires i3, Ghostty, Eww, Picom v13, Rofi, Dunst, Feh, XSS-lock, xdotool, playerctl, WirePlumber, Fcitx5, and commands used by the scripts. Some `bin/` shims point to local builds under `~/.local/opt/i3-extras`; install those builds or change the shims.
+The last path is a home directory.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- i3-horizon "$HOME"
 ```
 
-Set a wallpaper with `Super+Shift+W`; the original wallpaper is outside this repo.
+Requires i3, Ghostty, Eww, Picom v13, Rofi, Dunst, Feh, XSS-lock,
+xdotool, playerctl, WirePlumber, Fcitx5, and the scripts' commands.
+Some `bin/` shims expect local builds under `~/.local/opt/i3-extras`.
+Set a wallpaper with `Super+Shift+W`; the original is not included.

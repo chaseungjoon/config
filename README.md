@@ -1,6 +1,9 @@
 # Config
 
-Neovim, tmux, and two i3 themes. Each command installs its selected config from a downloaded snapshot. Replace the final path to choose the destination; existing files are backed up under `~/.local/state/config/`.
+Neovim, tmux, Arch desktop styling, and two i3 themes.
+
+Pick a destination in the last argument. Existing files are backed up under
+`~/.local/state/config/`. For Arch and i3, the destination is a home directory.
 
 ## Install
 
@@ -34,4 +37,4 @@ curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh
 curl -fsSL https://raw.githubusercontent.com/chaseungjoon/config/main/install.sh | bash -s -- i3-horizon "$HOME"
 ```
 
-For Arch and i3, the destination is a home root. See [i3](i3/) to compare the themes.
+Compare the i3 themes in [i3/](i3/).

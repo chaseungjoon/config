@@ -1,15 +1,15 @@
-# i3 themes
+# i3
 
 ## [Amber](amber/)
 
-Designed for low motion and hardware constraints.
+Low motion, built for hardware constraints.
 
 ![Amber screenshot pending](screenshots/amber-placeholder.svg)
 
 ## [Horizon](horizon/)
 
-Designed for high performance AI native workflows.
+High performance, built for AI native workflows.
 
 ![Horizon bar](screenshots/horizon-bar.png)
 
-See [SCREENSHOT.md](SCREENSHOT.md) to add Amber screenshots.
+Add Amber screenshots using [SCREENSHOT.md](SCREENSHOT.md).
