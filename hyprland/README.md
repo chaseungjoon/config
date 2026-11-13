@@ -12,6 +12,6 @@ An independent Hyprland setup.
 | **Palette** | Blue `#89b4fa` and mauve `#cba6f7` on Mocha `#1e1e2e` |
 | **Includes** | Its own Waybar, Rofi, Kitty, SwayOSD, and Waypaper |
 
-**[Mocha](mocha/)**: desktop with Kitty and Rofi
+**[Mocha](mocha/)**: desktop with Kitty
 
 ![Mocha desktop](screenshots/mocha-desktop.png)

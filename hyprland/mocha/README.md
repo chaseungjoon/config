@@ -53,6 +53,6 @@ Wi-Fi tray icons require nm-applet, and Bluetooth pairing prompts require
 blueman-applet. Start those applets separately if wanted.
 
 No wallpaper is included; set one with `Super+W`. Waypaper saves the choice
-in `hyprpaper.conf` for the next login. The screenshots use a temporary dark
-background; the bar preview removes the empty space between its three groups.
+in `hyprpaper.conf` for the next login. The desktop preview shows the live wallpaper and Kitty. The bar preview uses
+a temporary dark background and removes empty space between its three groups.
 Display, input, app, and workspace choices can be adjusted in the Lua config.
