@@ -2,6 +2,19 @@ return {
     {
         'neoclide/coc.nvim',
         branch = 'release',
+        init = function()
+            -- nvim launched outside an interactive shell (e.g. i3 `ghostty -e nvim`)
+            -- doesn't get nvm's PATH, so point coc at node explicitly.
+            if vim.fn.executable('node') == 1 then return end
+            local best, best_v
+            for _, p in ipairs(vim.fn.glob(vim.env.HOME .. '/.nvm/versions/node/v*/bin/node', false, true)) do
+                local v = vim.version.parse(p:match('/node/(v[^/]+)/'))
+                if v and vim.fn.executable(p) == 1 and (not best_v or vim.version.gt(v, best_v)) then
+                    best, best_v = p, v
+                end
+            end
+            if best then vim.g.coc_node_path = best end
+        end,
         config = function()
             local map = vim.api.nvim_set_keymap
 

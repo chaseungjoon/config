@@ -3,6 +3,23 @@ vim.g.loaded_ruby_provider = 0
 vim.cmd("set expandtab")
 vim.o.winborder = 'rounded'
 vim.cmd("set autoindent")
+-- On X11 Linux, use xclip explicitly: the auto-detected xsel can hang reading
+-- the clipboard, which froze nvim on startup (blank screen, no input).
+-- macOS and Wayland keep nvim's default provider.
+if vim.fn.has('mac') == 0 and vim.env.WAYLAND_DISPLAY == nil and vim.fn.executable('xclip') == 1 then
+    vim.g.clipboard = {
+        name = 'xclip',
+        copy = {
+            ['+'] = { 'xclip', '-quiet', '-i', '-selection', 'clipboard' },
+            ['*'] = { 'xclip', '-quiet', '-i', '-selection', 'primary' },
+        },
+        paste = {
+            ['+'] = { 'xclip', '-o', '-selection', 'clipboard' },
+            ['*'] = { 'xclip', '-o', '-selection', 'primary' },
+        },
+        cache_enabled = 1,
+    }
+end
 vim.cmd("set clipboard=unnamedplus")
 vim.cmd("set number")
 vim.cmd("set nocursorline")
