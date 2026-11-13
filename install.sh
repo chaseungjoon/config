@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  printf 'Usage: %s {nvim|tmux|arch|i3-amber|i3-horizon} ABSOLUTE_DESTINATION\n' "$0" >&2
+  printf 'Usage: %s {nvim|tmux|arch|i3-amber|i3-horizon|hyprland-mocha} ABSOLUTE_DESTINATION\n' "$0" >&2
   exit 2
 }
 
@@ -57,6 +57,11 @@ case $target in
     copy_tree "$root/i3/amber/i3blocks" "$dest/.config/i3blocks"
     ;;
   i3-horizon) copy_tree "$root/i3/horizon/i3" "$dest/.config/i3" ;;
+  hyprland-mocha)
+    for app in hypr waybar rofi kitty swayosd waypaper; do
+      copy_tree "$root/hyprland/mocha/$app" "$dest/.config/$app"
+    done
+    ;;
   *) usage ;;
 esac
 
